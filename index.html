@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DEVOUR</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06060f; }
+  body {
+    font-family: 'Arial Black', 'Arial', sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  canvas { display: block; position: absolute; top: 0; left: 0; }
+
+  /* ── UI Overlay ── */
+  #ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+  #scoreWrap {
+    position: absolute; top: 16px; left: 0; right: 0;
+    text-align: center; pointer-events: none;
+  }
+  #score {
+    font-size: 42px; font-weight: 900; letter-spacing: 2px;
+    color: #fff; text-shadow: 0 0 20px rgba(140,90,255,0.8), 0 2px 8px rgba(0,0,0,0.6);
+    transition: transform 0.12s ease-out;
+  }
+  #combo {
+    font-size: 18px; font-weight: 900; letter-spacing: 1px;
+    color: #ffd24d; text-shadow: 0 0 12px rgba(255,180,40,0.9);
+    margin-top: 2px; opacity: 0; transition: opacity 0.2s;
+    height: 22px;
+  }
+  #sizeHud {
+    font-size: 11px; font-weight: 900; letter-spacing: 1.4px;
+    color: rgba(255,255,255,0.55); text-shadow: 0 0 10px rgba(140,90,255,0.35);
+    margin-top: 2px; text-transform: uppercase;
+  }
+  #highScore {
+    position: absolute; top: 14px; right: 18px;
+    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+  }
+
+  /* ── Start Screen ── */
+  #startScreen, #gameOverScreen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: auto; z-index: 20;
+    background: rgba(6,6,15,0.82);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.4s;
+  }
+  #startScreen.hidden, #gameOverScreen.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .logo {
+    font-size: clamp(56px, 14vw, 120px);
+    font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #8c5aff 0%, #ff5a8c 50%, #ffd24d 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 40px rgba(140,90,255,0.6));
+    animation: logoFloat 3s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .tagline {
+    font-size: clamp(14px, 3.5vw, 18px); font-weight: 700;
+    color: rgba(255,255,255,0.6); letter-spacing: 3px;
+    margin-top: -4px; margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  .play-btn {
+    font-family: inherit;
+    font-size: 22px; font-weight: 900; letter-spacing: 2px;
+    color: #fff; text-transform: uppercase;
+    background: linear-gradient(135deg, #8c5aff, #ff5a8c);
+    border: none; border-radius: 50px;
+    padding: 18px 56px; cursor: pointer;
+    box-shadow: 0 8px 32px rgba(140,90,255,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+    pointer-events: auto;
+  }
+  .play-btn:hover { transform: scale(1.06); box-shadow: 0 12px 40px rgba(140,90,255,0.7); }
+  .play-btn:active { transform: scale(0.97); }
+  .hint {
+    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.35);
+    letter-spacing: 1px; margin-top: 28px; text-transform: uppercase;
+  }
+
+  /* ── Game Over ── */
+  #gameOverScreen .label {
+    font-size: clamp(36px, 9vw, 64px); font-weight: 900; letter-spacing: 3px;
+    color: #ff4060; text-shadow: 0 0 30px rgba(255,64,96,0.6);
+    margin-bottom: 8px;
+  }
+  #finalScore {
+    font-size: clamp(48px, 12vw, 80px); font-weight: 900;
+    color: #fff; text-shadow: 0 0 24px rgba(140,90,255,0.7);
+  }
+  #newRecord {
+    font-size: 16px; font-weight: 900; letter-spacing: 2px;
+    color: #ffd24d; text-shadow: 0 0 12px rgba(255,180,40,0.8);
+    height: 20px; margin-bottom: 8px; text-transform: uppercase;
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .stat-row {
+    font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.5);
+    letter-spacing: 1px; margin-bottom: 32px; text-transform: uppercase;
+  }
+
+  /* ── Ad-reward style buttons ── */
+  .reward-btn {
+    font-family: inherit;
+    font-size: 15px; font-weight: 900; letter-spacing: 1px;
+    color: #ffd24d; text-transform: uppercase;
+    background: rgba(255,210,77,0.12);
+    border: 2px solid rgba(255,210,77,0.4);
+    border-radius: 50px;
+    padding: 12px 28px; cursor: pointer;
+    margin-bottom: 16px; pointer-events: auto;
+    transition: all 0.15s;
+  }
+  .reward-btn:hover { background: rgba(255,210,77,0.2); border-color: #ffd24d; }
+  .reward-btn:active { transform: scale(0.96); }
+
+  /* ── Skins button + overlay ── */
+  .skins-btn {
+    font-family: inherit;
+    font-size: 13px; font-weight: 900; letter-spacing: 2px;
+    color: rgba(255,255,255,0.5); text-transform: uppercase;
+    background: transparent; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50px; padding: 10px 24px; cursor: pointer;
+    margin-top: 16px; pointer-events: auto;
+    transition: all 0.15s;
+  }
+  .skins-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+  #skinsOverlay {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 30; background: rgba(6,6,15,0.92);
+    backdrop-filter: blur(8px);
+    visibility: hidden;
+  }
+  #skinsOverlay.show { display: flex; visibility: visible; }
+  .skins-title {
+    font-size: 28px; font-weight: 900; letter-spacing: 3px;
+    color: #fff; margin-bottom: 6px;
+  }
+  .skins-sub {
+    font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 1px;
+    margin-bottom: 30px; text-transform: uppercase;
+  }
+  .skins-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; max-width: 380px; margin-bottom: 30px;
+  }
+  .skin-card {
+    width: 72px; height: 90px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 12px; border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .skin-card:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
+  .skin-card.selected { border-color: #8c5aff; background: rgba(140,90,255,0.15); box-shadow: 0 0 20px rgba(140,90,255,0.3); }
+  .skin-card.locked { opacity: 0.35; cursor: not-allowed; }
+  .skin-orb {
+    width: 36px; height: 36px; border-radius: 50%;
+    margin-bottom: 6px;
+  }
+  .skin-name {
+    font-size: 9px; font-weight: 900; letter-spacing: 1px;
+    color: rgba(255,255,255,0.7); text-transform: uppercase;
+  }
+  .skin-lock {
+    font-size: 8px; color: rgba(255,255,255,0.4); margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div id="scoreWrap">
+    <div id="score">0</div>
+    <div id="combo"></div>
+    <div id="sizeHud">MASS x1.0 · ERA 1</div>
+  </div>
+  <div id="highScore">BEST: 0</div>
+</div>
+
+<div id="startScreen">
+  <div class="logo">DEVOUR</div>
+  <div class="tagline">Eat. Grow. Survive.</div>
+  <button class="play-btn" id="playBtn">PLAY</button>
+  <div class="hint" id="startHint">Move your mouse or drag to move</div>
+  <button class="skins-btn" id="skinsBtn">🏁 SKINS</button>
+</div>
+
+<div id="skinsOverlay">
+  <div class="skins-title">SKINS</div>
+  <div class="skins-sub">Unlock by playing</div>
+  <div class="skins-grid" id="skinsGrid"></div>
+  <button class="play-btn" id="skinsCloseBtn" style="font-size:16px;padding:12px 36px;">BACK</button>
+</div>
+
+<div id="gameOverScreen" class="hidden">
+  <div class="label">DEVOURED</div>
+  <div id="newRecord"></div>
+  <div id="finalScore">0</div>
+  <div class="stat-row" id="statRow">Size 1 · 0s</div>
+  <button class="reward-btn" id="reviveBtn">▶ WATCH AD TO REVIVE</button>
+  <button class="play-btn" id="retryBtn">RETRY</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DEVOUR — arena devourer. Single-file HTML5 Canvas game.
+// ═══════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Input ──
+const mouse = { x: W/2, y: H/2, active: false };
+function setMouse(clientX, clientY) {
+  mouse.x = clientX;
+  mouse.y = clientY;
+  mouse.active = true;
+}
+canvas.addEventListener('mousemove', e => setMouse(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  setMouse(t.clientX, t.clientY);
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  setMouse(t.clientX, t.clientY);
+}, { passive: true });
+
+// ── Audio (Web Audio synth — tiny SFX, no files) ──
+let audioCtx;
+let lastEatSfxAt = 0;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (slide) osc.frequency.exponentialRampToValueAtTime(freq + slide, audioCtx.currentTime + dur);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
+function sfxEat(combo) {
+  const now = performance.now();
+  if (now - lastEatSfxAt < 25) return; // eating cascades should not spawn 100 oscillators/frame
+  lastEatSfxAt = now;
+  const base = 300 + Math.min(combo, 20) * 40;
+  playTone(base, 0.1, 'square', 0.08, base * 0.8);
+  setTimeout(() => playTone(base * 1.5, 0.08, 'sine', 0.06), 30);
+}
+function sfxDeath() {
+  playTone(200, 0.3, 'sawtooth', 0.2, -150);
+  setTimeout(() => playTone(120, 0.4, 'sawtooth', 0.15, -80), 80);
+}
+function sfxLevel() {
+  playTone(523, 0.1, 'sine', 0.1);
+  setTimeout(() => playTone(659, 0.1, 'sine', 0.1), 60);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 120);
+}
+// (Note: per user prefs, SFX is fine; only procedural *music* is rejected.)
+
+// ── Game State ──
+const STATE = { MENU: 0, PLAYING: 1, DEAD: 2 };
+let gameState = STATE.MENU;
+let revivesUsed = 0;
+
+const world = { x: 0, y: 0 }; // camera offset
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  r: 16,
+  displayR: 16,
+  lockSX: 0, lockSY: 0,
+  hue: 265,
+  squash: 1, // squash & stretch factor
+  alive: true,
+};
+
+// ── Control tuning ──
+// The player should feel magnetized to the mouse: tiny stop zone, near-instant
+// ramp, and aggressive 180s. Values are proportional to on-screen orb size so
+// the feel survives infinite zoom/growth.
+const CONTROL_DEADZONE_MIN = 4;
+const CONTROL_DEADZONE_SCREEN_R = 0.24;
+const CONTROL_RAMP_SCREEN_R = 0.42;
+const CONTROL_BASE_VISUAL_SPEED = 4.9;
+const CONTROL_TURN_BOOST = 1.18;
+const CONTROL_MAX_VISUAL_SPEED = 5.8;
+
+function getControlTuning() {
+  const screenRadius = Math.max(1, player.displayR * zoom);
+  const deadZone = Math.max(CONTROL_DEADZONE_MIN, screenRadius * CONTROL_DEADZONE_SCREEN_R);
+  const rampRange = Math.max(10, screenRadius * CONTROL_RAMP_SCREEN_R);
+  return { screenRadius, deadZone, rampRange };
+}
+
+let foods = [];
+let threats = [];
+let particles = [];
+let popups = [];
+let trail = [];
+let achievements_toast = [];
+let bgStars = [];
+
+let score = 0;
+let displayScore = 0;
+let combo = 0;
+let comboTimer = 0;
+let bestScore = parseInt(localStorage.getItem('devour_best') || '0');
+let bestSize = parseInt(localStorage.getItem('devour_bestsize') || '1');
+let startTime = 0;
+let elapsedTime = 0;
+let spawnTimer = 0;
+let threatSpawnTimer = 0;
+let feastTimer = 0;
+let dangerGraceTimer = 0;
+let shakeAmount = 0;
+let zoom = 1;
+let targetZoom = 1;
+let level = 1;
+
+// ── Shepard-tone octave scale system ──
+// player.r is bounded to [R_OCT_MIN, R_OCT_MAX]. When it crosses R_OCT_MAX,
+// ALL world coords/radii are divided by 2 and zoom is multiplied by 2. The
+// on-screen appearance is IDENTICAL before and after (math is exact), but
+// internally the numbers stay small forever. This is the Shepard-tone illusion:
+// the orb feels like it grows infinitely, but it's actually looping through a
+// fixed octave range. No more number-stacking until browser death.
+// scaleOctave tracks how many times we've doubled — the true cosmic ascent.
+const R_OCT_MIN = 16;
+const R_OCT_MAX = 48;   // 3× octave range — feels like real growth, not a stutter
+const R_OCT_PIVOT = 28;  // ~mid-octave, the "breathing center" for zoom
+let scaleOctave = 0;     // incremented on each up-shift, decremented on revive shrink
+let octaveFlash = 0;     // brief visual pulse on octave shift (juice)
+let octaveShiftCooldown = 0; // frames until next octave shift is allowed (prevents rapid loop)
+let OCTAVE_COOLDOWN_MAX = 45; // ~0.75s at 60fps — enough to break the eat→zoom→eat loop
+
+// ── Skin System (unlockable cosmetics = retention) ──
+const SKINS = [
+  { name: 'VOID',    hue: 265, glow: 140, unlock: () => true,                    desc: 'Default' },
+  { name: 'EMBER',   hue: 20,  glow: 200, unlock: () => bestScore >= 100,        desc: 'Score 100' },
+  { name: 'TOXIC',   hue: 130, glow: 160, unlock: () => bestScore >= 500,        desc: 'Score 500' },
+  { name: 'GOLD',    hue: 45,  glow: 220, unlock: () => bestScore >= 1000,       desc: 'Score 1000' },
+  { name: 'ICE',     hue: 195, glow: 180, unlock: () => bestSize >= 3,           desc: 'Size 3' },
+  { name: 'BLOOD',   hue: 350, glow: 240, unlock: () => bestScore >= 2500,       desc: 'Score 2500' },
+  { name: 'PRISM',   hue: -1,  glow: 260, unlock: () => bestScore >= 5000,       desc: 'Score 5000' }, // rainbow
+];
+let currentSkin = parseInt(localStorage.getItem('devour_skin') || '0');
+
+// ── Achievements ──
+const ACHIEVEMENTS = [
+  { id: 'first_eat',   name: 'FIRST BITE',      check: () => score >= 1 },
+  { id: 'combo_10',    name: 'COMBO MASTER',     check: () => combo >= 10 },
+  { id: 'combo_25',    name: 'COMBO GOD',        check: () => combo >= 25 },
+  { id: 'level_5',     name: 'GROWING UP',       check: () => level >= 5 },
+  { id: 'level_10',    name: 'APEX PREDATOR',    check: () => level >= 10 },
+  { id: 'score_500',   name: 'HUNGRY',           check: () => score >= 500 },
+  { id: 'score_1000',  name: 'RAVENOUS',         check: () => score >= 1000 },
+  { id: 'threat_eat',  name: 'PREDATOR',         check: () => threatsEaten >= 1 },
+  { id: 'threat_5',    name: 'APEX',             check: () => threatsEaten >= 5 },
+];
+let threatsEaten = 0;
+let unlockedAchievements = JSON.parse(localStorage.getItem('devour_ach') || '[]');
+
+function checkAchievements() {
+  for (const a of ACHIEVEMENTS) {
+    if (!unlockedAchievements.includes(a.id) && a.check()) {
+      unlockedAchievements.push(a.id);
+      localStorage.setItem('devour_ach', JSON.stringify(unlockedAchievements));
+      achievements_toast.push({ name: a.name, life: 1, timer: 180 });
+      if (achievements_toast.length > 3) achievements_toast.splice(0, achievements_toast.length - 3);
+      sfxLevel();
+    }
+  }
+}
+
+function getPlayerHue() {
+  const skin = SKINS[currentSkin];
+  if (skin.hue === -1) return (performance.now() / 20) % 360; // rainbow
+  return skin.hue;
+}
+function getPlayerGlow() {
+  return SKINS[currentSkin].glow;
+}
+
+// ── Background stars (parallax) ──
+// Stars are stored relative to origin but rendered relative to the player so
+// they always surround the orb at every cosmic scale (Shepard-tone safe).
+function initStars() {
+  bgStars = [];
+  for (let i = 0; i < 120; i++) {
+    bgStars.push({
+      x: (Math.random() - 0.5) * 4000,
+      y: (Math.random() - 0.5) * 4000,
+      r: Math.random() * 1.5 + 0.3,
+      a: Math.random() * 0.5 + 0.2,
+      layer: Math.random() * 0.5 + 0.3,
+    });
+  }
+}
+initStars();
+
+// ── Spawning ──
+const FOOD_COLORS = [180, 200, 280, 320, 40, 140]; // hues
+const FOOD_TIERS = {
+  crumb:   { name: 'crumb',   label: '',        ratio: [0.050, 0.075], value: 1,  growth: 0.010, glow: 2.6, unlock: 1,  ring: false },
+  bite:    { name: 'bite',    label: '',        ratio: [0.085, 0.130], value: 3,  growth: 0.016, glow: 3.0, unlock: 1,  ring: false },
+  chunk:   { name: 'chunk',   label: '',        ratio: [0.170, 0.260], value: 9,  growth: 0.032, glow: 3.8, unlock: 3,  ring: true  },
+  feast:   { name: 'feast',   label: '',        ratio: [0.330, 0.500], value: 24, growth: 0.065, glow: 4.8, unlock: 5,  ring: true  },
+  jackpot: { name: 'jackpot', label: '',        ratio: [0.680, 0.950], value: 85, growth: 0.135, glow: 6.5, unlock: 8,  ring: true  },
+};
+
+function getEra() {
+  // Era is now based on scaleOctave (the true cosmic level), not player.r directly.
+  // Each octave = one era step. Early octaves still progress smoothly.
+  return Math.max(1, scaleOctave + 1);
+}
+
+// ── Shepard-tone octave shift ──
+// When player.r exceeds R_OCT_MAX, divide ALL world-space numbers by 2 and
+// multiply zoom by 2. On-screen: pixel-identical. Internally: numbers halved.
+// scaleOctave++ tracks the true ascent. This is the "seamless wrap" that makes
+// infinite growth feel continuous without ever growing the numbers.
+function checkOctaveShift() {
+  // Cooldown gate: rapid eat→zoom→eat loops happen when food condenses onto the
+  // player every shift, gets instantly re-eaten, crosses the threshold again.
+  // The cooldown forces a pause between shifts so the player has to actually
+  // hunt food in the new octave instead of vacuuming a pre-condensed pocket.
+  if (octaveShiftCooldown > 0) {
+    octaveShiftCooldown--;
+    // During cooldown, HOLD growth at the boundary instead of continuing to grow.
+    // Otherwise player.r keeps inflating while we wait and one shift cascades.
+    if (player.r > R_OCT_MAX) {
+      player.r = R_OCT_MAX;
+      player.displayR = R_OCT_MAX;
+    }
+    return;
+  }
+  let shifted = false;
+  // Up-shift: player got too big for this octave
+  while (player.r > R_OCT_MAX) {
+    const factor = 0.5;
+    player.r *= factor;
+    player.displayR *= factor;
+    player.x *= factor;
+    player.y *= factor;
+    player.vx *= factor;
+    player.vy *= factor;
+    world.x *= factor;
+    world.y *= factor;
+    zoom *= 2;
+    targetZoom *= 2;
+    scaleOctave++;
+    shifted = true;
+  }
+  // Down-shift safety: if revive shrink drops below R_OCT_MIN, scale back up
+  // (rare, but prevents the orb from becoming a pixel after revive at high octave)
+  while (player.r < R_OCT_MIN * 0.5 && scaleOctave > 0) {
+    const factor = 2;
+    player.r *= factor;
+    player.displayR *= factor;
+    player.x *= factor;
+    player.y *= factor;
+    player.vx *= factor;
+    player.vy *= factor;
+    world.x *= factor;
+    world.y *= factor;
+    zoom *= 0.5;
+    targetZoom *= 0.5;
+    scaleOctave--;
+  }
+  if (shifted) {
+    // Scale all entities to the new octave's coordinate space
+    for (const f of foods) { f.x *= 0.5; f.y *= 0.5; f.r *= 0.5; f.vx *= 0.5; f.vy *= 0.5; }
+    for (const t of threats) { t.x *= 0.5; t.y *= 0.5; t.r *= 0.5; t.vx *= 0.5; t.vy *= 0.5; }
+    for (const p of particles) { p.x *= 0.5; p.y *= 0.5; p.vx *= 0.5; p.vy *= 0.5; }
+    for (const p of popups) { p.x *= 0.5; p.y *= 0.5; }
+    for (const tr of trail) { tr.x *= 0.5; tr.y *= 0.5; tr.r *= 0.5; }
+
+    // ── BREAK THE FEEDBACK LOOP ──
+    // After scaling, all food has been pulled halfway toward the player's new
+    // position. This creates a dense pocket ON TOP of the orb that gets instantly
+    // re-eaten → crosses threshold → shifts again → infinite eat/zoom loop.
+    // Fix: cull any food that ended up too close (inside the eat radius) and
+    // redistribute some of it outward so the player has to actually move to eat.
+    const halfScreen = Math.max(W, H) / 2 / Math.max(zoom, 0.0001);
+    const minSafeDist = player.r * 2.2; // well outside the eat radius
+    let culledCount = 0;
+    for (let i = foods.length - 1; i >= 0; i--) {
+      const f = foods[i];
+      const d = Math.hypot(f.x - player.x, f.y - player.y);
+      if (d < minSafeDist) {
+        // Push it out to a random point in the visible field instead of deleting,
+        // so the food count stays healthy and the field doesn't look empty.
+        const a = Math.random() * Math.PI * 2;
+        const newDist = minSafeDist + Math.random() * halfScreen * 0.6;
+        f.x = player.x + Math.cos(a) * newDist;
+        f.y = player.y + Math.sin(a) * newDist;
+        culledCount++;
+      }
+    }
+
+    octaveFlash = 1; // visual juice
+    octaveShiftCooldown = OCTAVE_COOLDOWN_MAX; // prevent immediate re-trigger
+  }
+}
+
+function chooseFoodTier(forceTier = null) {
+  if (forceTier && FOOD_TIERS[forceTier]) return FOOD_TIERS[forceTier];
+  const era = getEra();
+  // The table intentionally shifts from snack-dense early play into chunky,
+  // jackpot-heavy mid/late play so growth never becomes invisible or stale.
+  const weighted = [
+    ['crumb',   Math.max(10, 48 - era * 5)],
+    ['bite',    34],
+    ['chunk',   level >= 3 ? 12 + era * 5 : 0],
+    ['feast',   level >= 5 ?  2 + era * 3 : 0],
+    ['jackpot', level >= 8 ?  1 + era * 1.2 : 0],
+  ];
+  const total = weighted.reduce((s, [, w]) => s + w, 0);
+  let roll = Math.random() * total;
+  for (const [name, weight] of weighted) {
+    roll -= weight;
+    if (roll <= 0) return FOOD_TIERS[name];
+  }
+  return FOOD_TIERS.bite;
+}
+
+function spawnFood(forceTier = null, spread = 1) {
+  const tier = chooseFoodTier(forceTier);
+  const ratio = tier.ratio[0] + Math.random() * (tier.ratio[1] - tier.ratio[0]);
+  const baseR = Math.max(7, player.r * ratio);
+  const angle = Math.random() * Math.PI * 2;
+  const halfScreen = Math.max(W, H) / 2 / Math.max(zoom, 0.0001);
+  // Spawn mostly inside the view, but never inside the player. Big chunks appear
+  // as chaseable targets just outside/around your body instead of random crumbs.
+  const minDist = player.r + baseR + 22 / Math.max(zoom, 0.0001);
+  const maxDist = Math.max(minDist + 120 / Math.max(zoom, 0.0001), halfScreen * (0.72 + spread * 0.45));
+  const dist = minDist + Math.random() * (maxDist - minDist);
+  foods.push({
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    r: baseR,
+    tier: tier.name,
+    label: tier.label,
+    value: tier.value,
+    growth: tier.growth,
+    glow: tier.glow,
+    ring: tier.ring,
+    hue: FOOD_COLORS[Math.floor(Math.random() * FOOD_COLORS.length)],
+    vx: (Math.random() - 0.5) * (0.25 / Math.max(zoom, 0.35)),
+    vy: (Math.random() - 0.5) * (0.25 / Math.max(zoom, 0.35)),
+    pulse: Math.random() * Math.PI * 2,
+  });
+}
+
+function getViewHalf() {
+  return Math.max(W, H) / 2 / Math.max(zoom, 0.0001);
+}
+
+function getFoodCap() {
+  return Math.min(260, 74 + level * 6 + Math.floor(getViewHalf() / 42));
+}
+
+function trimFoodsToCap(cap = getFoodCap()) {
+  if (foods.length <= cap) return;
+  // Keep closest food; delete overflow caused by feast/jackpot burst storms.
+  foods.sort((a, b) => {
+    const da = (a.x - player.x) ** 2 + (a.y - player.y) ** 2;
+    const db = (b.x - player.x) ** 2 + (b.y - player.y) ** 2;
+    return da - db;
+  });
+  foods.length = cap;
+}
+
+function spawnFoodBurst(count = 12, forceTier = null, spread = 0.65) {
+  const cap = getFoodCap();
+  const allowed = Math.max(0, Math.min(count, cap - foods.length));
+  for (let i = 0; i < allowed; i++) spawnFood(forceTier, spread);
+}
+
+function spawnThreat() {
+  const angle = Math.random() * Math.PI * 2;
+  // Spawn just beyond the visible edge, scaled by zoom/player size so threats
+  // stay present at every cosmic scale instead of becoming rare furniture.
+  const halfScreen = Math.max(W, H) / 2 / Math.max(zoom, 0.0001);
+  const dist = halfScreen + player.r * (0.55 + Math.random() * 0.35) + 90 / Math.max(zoom, 0.0001);
+  // Aggressive role mix: hunters dominate so threats actually pressure you.
+  // Fewer passive prey, more deadly hunters, apex still rare but present.
+  const roll = Math.random();
+  let sizeRatio, role;
+  if (roll < 0.28) {
+    sizeRatio = 0.42 + Math.random() * 0.42; // edible prey (chase reward)
+    role = 'prey';
+  } else if (roll < 0.88) {
+    sizeRatio = 1.18 + Math.random() * 0.42; // hunter — bigger and stays dangerous
+    role = 'hunter';
+  } else {
+    sizeRatio = 1.55 + Math.random() * 0.65; // rare apex — massive persistent threat
+    role = 'apex';
+  }
+  const threatR = player.r * sizeRatio;
+  // growthLink: threats grow at a fraction of the player's growth rate so they
+  // STAY RELEVANT as you eat. Without this, a hunter spawned at 1.3x becomes
+  // trivially edible after a few dots — the player outgrows the danger.
+  // Hunter keeps ~75% pace (hard to outgrow), apex ~65%, prey 0% (meant to be eaten).
+  const growthLink = role === 'prey' ? 0 : role === 'apex' ? 0.65 : 0.75;
+  // Visual speed stays alive after zoom-out. Boosted across the board so
+  // threats are genuinely dangerous and can run you down — the old values
+  // were so slow that threats never closed the gap against a cursor-locked player.
+  const visualThreatSpeed = role === 'prey'
+    ? 2.0 + Math.random() * 1.0
+    : role === 'apex'
+      ? 1.45 + Math.random() * 0.55
+      : 1.85 + Math.random() * 0.85;
+  const baseThreatSpeed = visualThreatSpeed / Math.max(zoom, 0.0001);
+  // speedMod: bigger threats are slightly slower per unit but remain deadly.
+  const speedMod = sizeRatio < 1 ? 1.25 : Math.max(0.58, 2.0 - sizeRatio * 0.4);
+  threats.push({
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    r: threatR,
+    role,
+    vx: 0, vy: 0,
+    hue: 0,
+    pulse: Math.random() * Math.PI * 2,
+    speed: baseThreatSpeed * speedMod,
+    growthLink,
+    huntDelay: 20 + Math.random() * 25,
+    life: 0,
+    spawnFade: 0, // 0→1, harmless until 1
+    spikePhase: Math.random() * Math.PI * 2,
+  });
+}
+
+function spawnParticles(x, y, hue, count, speed) {
+  const allowed = Math.max(0, Math.min(count, 900 - particles.length));
+  for (let i = 0; i < allowed; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * speed + speed * 0.3;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * s,
+      vy: Math.sin(a) * s,
+      r: Math.random() * 3 + 1,
+      hue: hue + (Math.random() - 0.5) * 30,
+      life: 1,
+      decay: 0.02 + Math.random() * 0.02,
+    });
+  }
+}
+
+let popupFanAngle = 0;
+function spawnPopup(x, y, text, color) {
+  // Milestone banners self-dedupe so a feast field doesn't stack 8 of the same label.
+  const noisy = text === 'FEAST WAVE' || text === 'PREDATOR BONUS' || text === 'FEAST FIELD!' || text === 'JACKPOT FIELD!';
+  if (noisy && popups.some(p => p.text === text && p.life > 0.45)) return;
+
+  // When the screen is already busy, drop trivial +N score popups so the orb
+  // stays readable during feast/jackpot cascades. Big labels (FEAST/JACKPOT/CHOMP/LEVEL) always pass.
+  const trivial = /^\+\d+$/.test(text);
+  if (trivial && popups.length > 14) return;
+
+  // Fan any popup that would land ON the orb out to a ring around it, using a
+  // golden-angle step so successive popups spread instead of stacking on one pixel.
+  const dx = x - player.x, dy = y - player.y;
+  const dist = Math.hypot(dx, dy);
+  const minClear = player.r * 1.5 + 16 / Math.max(zoom, 0.0001);
+  let px = x, py = y;
+  if (dist < minClear) {
+    popupFanAngle += 2.39996; // golden angle (~137.5°)
+    const baseAng = dist > 0.1 ? Math.atan2(dy, dx) : popupFanAngle;
+    // blend toward the golden-angle fan so a tight cluster spreads around the orb
+    const ang = dist > 0.1 ? baseAng + (popupFanAngle * 0.15) : popupFanAngle;
+    px = player.x + Math.cos(ang) * minClear;
+    py = player.y + Math.sin(ang) * minClear;
+  }
+
+  popups.push({ x: px, y: py, text, color, life: 1, vy: -1.2 });
+  if (popups.length > 28) popups.splice(0, popups.length - 28);
+}
+
+// ── Game lifecycle ──
+function startGame() {
+  gameState = STATE.PLAYING;
+  player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
+  player.r = 16; player.displayR = 16;
+  player.squash = 1; player.alive = true;
+  foods = []; threats = []; particles = []; popups = []; trail = []; achievements_toast = [];
+  score = 0; displayScore = 0; combo = 0; comboTimer = 0;
+  spawnTimer = 0; threatSpawnTimer = 0; feastTimer = 720; dangerGraceTimer = 180;
+  shakeAmount = 0; zoom = 1; targetZoom = 1; level = 1;
+  scaleOctave = 0; octaveFlash = 0; octaveShiftCooldown = 0;
+  threatsEaten = 0;
+  startTime = performance.now();
+  revivesUsed = 0;
+  // initial food: dense snack field plus a few visible bites so the first
+  // 20 seconds already has choices instead of flat dot-mowing.
+  for (let i = 0; i < 58; i++) spawnFood();
+  for (let i = 0; i < 7; i++) spawnFood('bite', 0.55);
+  for (let i = 0; i < 4; i++) spawnThreat();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameOverScreen').classList.add('hidden');
+}
+
+function gameOver() {
+  if (gameState !== STATE.PLAYING) return;
+  gameState = STATE.DEAD;
+  player.alive = false;
+  shakeAmount = 30;
+  spawnParticles(player.x, player.y, getPlayerHue(), 40, 8);
+  sfxDeath();
+  // True cosmic size — octave-aware
+  const size = Math.max(1, Math.floor((player.r / R_OCT_MIN) * Math.pow(2, scaleOctave)));
+  elapsedTime = (performance.now() - startTime) / 1000;
+
+  // High scores
+  let newRecord = false;
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('devour_best', String(bestScore));
+    newRecord = true;
+  }
+  if (size > bestSize) {
+    bestSize = size;
+    localStorage.setItem('devour_bestsize', String(bestSize));
+    newRecord = true;
+  }
+
+  // Show game over screen after a brief delay for impact
+  setTimeout(() => {
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('newRecord').textContent = newRecord ? '★ NEW RECORD ★' : '';
+    document.getElementById('statRow').textContent = `Size ${size} · ${Math.floor(elapsedTime)}s`;
+    const reviveBtn = document.getElementById('reviveBtn');
+    reviveBtn.style.display = revivesUsed < 1 ? 'block' : 'none';
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+    document.getElementById('highScore').textContent = `BEST: ${bestScore}`;
+  }, 700);
+}
+
+function revive() {
+  if (gameState !== STATE.DEAD) return;
+  revivesUsed++;
+  gameState = STATE.PLAYING;
+  player.alive = true;
+  // Clear nearby threats — radius scales with zoom/player size so revive stays fair forever
+  const reviveClear = Math.max(500, player.r * 3, Math.max(W, H) / Math.max(zoom, 0.0001));
+  threats = threats.filter(t => {
+    const dx = t.x - player.x, dy = t.y - player.y;
+    return Math.hypot(dx, dy) > reviveClear;
+  });
+  // Shrink slightly so it's fair. player.r is bounded by the octave system,
+  // so just drop within the current octave. checkOctaveShift() handles the rest.
+  player.r = Math.max(R_OCT_MIN, player.r * 0.7);
+  player.displayR = player.r;
+  dangerGraceTimer = 120;
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  initAudio();
+}
+
+// ── Update ──
+function update(dt) {
+  if (gameState !== STATE.PLAYING) return;
+
+  elapsedTime = (performance.now() - startTime) / 1000;
+  dangerGraceTimer = Math.max(0, dangerGraceTimer - dt);
+  const playerGrowthStartR = player.r;
+
+  // ── Player movement — cursor locked ──
+  // The orb is the pointer now. Convert the pointer's screen-space offset from
+  // center into world-space, teleport there, and keep velocity only for trail/AI.
+  const dx = mouse.x - W / 2;
+  const dy = mouse.y - H / 2;
+  const oldX = player.x;
+  const oldY = player.y;
+  player.x = world.x + dx / Math.max(zoom, 0.0001);
+  player.y = world.y + dy / Math.max(zoom, 0.0001);
+  player.vx = player.x - oldX;
+  player.vy = player.y - oldY;
+
+  // ── Squash recovery ──
+  player.squash += (1 - player.squash) * 0.15 * dt;
+  player.displayR += (player.r - player.displayR) * 0.2 * dt;
+
+  // ── Combo decay ──
+  if (combo > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) {
+      combo = 0;
+      document.getElementById('combo').style.opacity = '0';
+    }
+  }
+
+  // ── Food spawning ── (count + quality scale with view so the field stays full)
+  spawnTimer -= dt;
+  const viewHalf = getViewHalf();
+  const foodCap = getFoodCap();
+  trimFoodsToCap(foodCap);
+  if (spawnTimer <= 0 && foods.length < foodCap) {
+    const deficit = foodCap - foods.length;
+    const batch = Math.min(5, Math.max(1, Math.ceil(deficit / 55)));
+    for (let i = 0; i < batch; i++) spawnFood();
+    spawnTimer = Math.max(2, 10 - level * 0.18) + Math.random() * 8;
+  }
+
+  // Periodic feast fields: high-reward clusters that create "oh hell yes"
+  // moments after the early-game zoom progression would otherwise flatten out.
+  feastTimer -= dt;
+  if (level >= 4 && feastTimer <= 0) {
+    const force = level >= 9 && Math.random() < 0.35 ? 'jackpot' : level >= 6 ? 'feast' : 'chunk';
+    spawnFoodBurst(8 + Math.min(12, Math.floor(level / 2)), force, 0.45);
+    spawnPopup(player.x, player.y - player.r - 30 / Math.max(zoom, 0.0001), force === 'jackpot' ? 'JACKPOT FIELD!' : 'FEAST FIELD!', '#ffd24d');
+    sfxLevel();
+    feastTimer = Math.max(520, 1050 - level * 24);
+  }
+
+  // ── Threat spawning ── (cap and speed scale with the new infinite camera)
+  threatSpawnTimer -= dt;
+  const threatCap = Math.min(52, 6 + Math.floor(level * 0.85) + Math.floor(viewHalf / 850));
+  if (threats.length < Math.max(4, Math.floor(threatCap * 0.55))) {
+    spawnThreat();
+  }
+  if (threatSpawnTimer <= 0 && threats.length < threatCap) {
+    const batch = Math.min(3, threatCap - threats.length);
+    for (let i = 0; i < batch; i++) spawnThreat();
+    threatSpawnTimer = Math.max(12, 72 - level * 2.6);
+  }
+
+  // ── Update foods ──
+  let foodEatsThisFrame = 0;
+  let massGainedThisFrame = 0;
+  const maxMassGainThisFrame = Math.max(4, player.r * 0.018);
+  const maxFoodEatsPerFrame = 12;
+  for (let i = foods.length - 1; i >= 0; i--) {
+    const f = foods[i];
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+    f.pulse += 0.05 * dt;
+
+    const fdx = f.x - player.x, fdy = f.y - player.y;
+    const dist = Math.hypot(fdx, fdy);
+
+    // Cull only once well past the visible screen edge (scales with zoom/player)
+    if (dist > viewHalf + Math.max(520, player.r * 1.7)) { foods.splice(i, 1); continue; }
+
+    // Eat check
+    if (foodEatsThisFrame < maxFoodEatsPerFrame && dist < player.r + f.r) {
+      foodEatsThisFrame++;
+      foods.splice(i, 1);
+      combo++;
+      comboTimer = 105 + Math.min(80, (f.value || 1) * 4);
+      const comboMult = 1 + Math.min(combo, 50) * 0.035;
+      // Hard cap per bite prevents exponential runaway/freezes at cosmic scale.
+      const rawMassGain = player.r * (f.growth || 0.012) * comboMult;
+      const maxGainRatio = f.tier === 'jackpot' ? 0.040 : f.tier === 'feast' ? 0.032 : f.tier === 'chunk' ? 0.024 : 0.016;
+      const remainingMassBudget = Math.max(0, maxMassGainThisFrame - massGainedThisFrame);
+      const massGain = Math.max(0, Math.min(rawMassGain, player.r * maxGainRatio, remainingMassBudget));
+      const points = Math.ceil((f.value || 1) * comboMult * getEra());
+      score += points;
+      // Grow proportionally to food tier so big dots stay emotionally meaningful
+      player.r += massGain;
+      massGainedThisFrame += massGain;
+      player.squash = f.tier === 'jackpot' ? 0.45 : f.tier === 'feast' ? 0.55 : 0.7;
+      // Juice
+      const particleCount = 7 + Math.min(28, Math.ceil((f.value || 1) * 1.4));
+      spawnParticles(f.x, f.y, f.hue, particleCount, f.tier === 'jackpot' ? 10 : f.tier === 'feast' ? 7 : 4.5);
+      const label = f.label ? `${f.label} +${points}` : '+' + points;
+      spawnPopup(f.x, f.y - f.r, label, f.tier === 'jackpot' ? '#ffd24d' : `hsl(${f.hue}, 80%, 70%)`);
+      sfxEat(combo + (f.value || 1));
+      if (f.tier === 'feast' || f.tier === 'jackpot') {
+        shakeAmount = Math.max(shakeAmount, f.tier === 'jackpot' ? 14 : 8);
+        // A jackpot creates a few follow-up chunks nearby — tiny dopamine trail.
+        if (f.tier === 'jackpot') spawnFoodBurst(5, 'chunk', 0.35);
+      }
+      // Show combo
+      if (combo >= 2) {
+        const el = document.getElementById('combo');
+        el.textContent = combo + 'x COMBO';
+        el.style.opacity = '1';
+      }
+      // Level up (visual/feedback only — zoom is now continuous + octave-based)
+      const newLevel = scaleOctave * 3 + Math.floor((player.r - R_OCT_MIN) / 4) + 1;
+      if (newLevel > level) {
+        level = newLevel;
+        sfxLevel();
+        spawnParticles(player.x, player.y, getPlayerHue(), 20 + Math.min(24, level), 6);
+        spawnPopup(player.x, player.y - player.r - 20, 'LEVEL ' + level + '!', '#ffd24d');
+        if (level >= 3 && level % 3 === 0) {
+          spawnFoodBurst(8 + Math.min(10, level), level >= 9 ? 'feast' : 'chunk', 0.48);
+          spawnPopup(player.x, player.y + player.r + 35 / Math.max(zoom, 0.0001), 'FEAST WAVE', '#ffd24d');
+          feastTimer = Math.min(feastTimer, 360);
+        }
+      }
+    }
+  }
+
+  // ── Update threats ──
+  let threatEatsThisFrame = 0;
+  const maxThreatEatsPerFrame = 4;
+  // Player grew this frame? Threats with growthLink grow at a fraction of that
+  // so hunters stay relevant as you eat — you can't just outgrow the danger.
+  const playerGrowthThisFrame = Math.max(0, player.r - playerGrowthStartR);
+  for (let i = threats.length - 1; i >= 0; i--) {
+    const t = threats[i];
+    t.life += dt;
+    // Growth-linked threats scale up with the player's eating this frame.
+    // This is the key fix: a hunter spawned at 1.2x stays competitive — you
+    // can't outgrow it by grabbing a few dots. You must actively out-eat it.
+    if (t.growthLink && playerGrowthThisFrame > 0.001) {
+      t.r += playerGrowthThisFrame * t.growthLink;
+    }
+    t.pulse += 0.04 * dt;
+    t.spikePhase += 0.03 * dt;
+
+    const tdx = player.x - t.x, tdy = player.y - t.y;
+    const dist = Math.hypot(tdx, tdy);
+
+    // Cull only once well past the visible screen edge (scales with zoom/player)
+    if (dist > viewHalf + Math.max(760, player.r * 2.3)) { threats.splice(i, 1); continue; }
+
+    // Cull stale threats that have become trivially small relative to the player.
+    // As the player grows within an octave, old threats shrink to meaninglessness
+    // and clog the threat cap — preventing fresh, properly-sized red threats from
+    // spawning. Anything below 22% of the player is just clutter at this point.
+    if (t.r < player.r * 0.22) { threats.splice(i, 1); continue; }
+
+    // Spawn fade-in (harmless until fully materialized)
+    if (t.spawnFade < 1) {
+      t.spawnFade = Math.min(1, t.spawnFade + 0.02 * dt);
+    }
+
+    // Hunters chase with PREDICTIVE LEADING — they aim at where you're going,
+    // not where you are, so they cut off escapes instead of trailing behind.
+    // Edible prey flees once you get close.
+    if (t.life > t.huntDelay && t.spawnFade >= 1) {
+      const safeDist = Math.max(dist, 0.001);
+      const playerCanEat = player.r > t.r * 1.08;
+      const flee = playerCanEat && safeDist < player.r * 5.2;
+      // Predict player position: project velocity forward by ~leadTime frames.
+      // Bigger/slower threats lead less; fast hunters lead hard to intercept.
+      const playerSpeed = Math.hypot(player.vx, player.vy);
+      const leadTime = flee ? 0 : Math.min(38, 12 + safeDist * 0.06);
+      const predX = player.x + player.vx * leadTime * 0.55;
+      const predY = player.y + player.vy * leadTime * 0.55;
+      const pdx = predX - t.x, pdy = predY - t.y;
+      const pd = Math.max(Math.hypot(pdx, pdy), 0.001);
+      let dirX, dirY;
+      if (flee) {
+        // flee directly away from player
+        dirX = -tdx / safeDist;
+        dirY = -tdy / safeDist;
+      } else {
+        // steer toward predicted intercept point
+        dirX = pdx / pd;
+        dirY = pdy / pd;
+        // If player is barely moving, blend toward direct chase so a still
+        // player still gets pressured (pure lead would overshoot).
+        const moveBlend = Math.min(1, playerSpeed * 0.12);
+        dirX = dirX * (1 - moveBlend * 0.4) + (tdx / safeDist) * (moveBlend * 0.4);
+        dirY = dirY * (1 - moveBlend * 0.4) + (tdy / safeDist) * (moveBlend * 0.4);
+        const dl = Math.max(Math.hypot(dirX, dirY), 0.001);
+        dirX /= dl; dirY /= dl;
+      }
+      const accel = (flee ? 0.085 : 0.075) * dt;
+      t.vx += dirX * t.speed * accel;
+      t.vy += dirY * t.speed * accel;
+      const sp = Math.hypot(t.vx, t.vy);
+      const maxSp = t.speed * (flee ? 1.35 : 1.12);
+      if (sp > maxSp) { t.vx = (t.vx / sp) * maxSp; t.vy = (t.vy / sp) * maxSp; }
+    }
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+
+    // Death check — only if threat is bigger AND fully spawned in
+    if (dangerGraceTimer <= 0 && t.spawnFade >= 1 && player.r < t.r * 0.92 && dist < player.r + t.r - 4) {
+      gameOver();
+      return;
+    }
+
+    // Eat threat if player is bigger!
+    if (threatEatsThisFrame < maxThreatEatsPerFrame && t.spawnFade >= 1 && player.r > t.r * 1.08 && dist < player.r + t.r * 0.66) {
+      threatEatsThisFrame++;
+      threats.splice(i, 1);
+      combo += 2;
+      comboTimer = 150;
+      const points = Math.ceil((18 + t.r / 3) * getEra());
+      score += points;
+      const rawGain = Math.max(2.5, t.r * (t.role === 'apex' ? 0.28 : 0.22));
+      const remainingMassBudget = Math.max(0, maxMassGainThisFrame - massGainedThisFrame);
+      const gain = Math.min(rawGain, remainingMassBudget);
+      player.r += gain;
+      massGainedThisFrame += gain;
+      player.squash = 0.52;
+      threatsEaten++;
+      spawnParticles(t.x, t.y, 20, 34, 8.5);
+      spawnPopup(t.x, t.y - t.r, '+' + points + ' CHOMP!', '#ff6040');
+      sfxEat(combo + 8);
+      shakeAmount = Math.max(shakeAmount, 11);
+      if (threatsEaten % 3 === 0) {
+        spawnFoodBurst(7, level >= 8 ? 'feast' : 'chunk', 0.42);
+        spawnPopup(player.x, player.y + player.r + 30 / Math.max(zoom, 0.0001), 'PREDATOR BONUS', '#ff6040');
+      }
+    }
+  }
+
+  // ── Update particles ──
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= Math.pow(0.94, dt);
+    p.vy *= Math.pow(0.94, dt);
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ── Update popups ──
+  // When the screen is crowded, burn popups down faster so a feast-field flood
+  // clears in under a second instead of lingering over the orb.
+  const crowdDecay = popups.length > 14 ? 1 + (popups.length - 14) * 0.14 : 1;
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.y += p.vy * dt;
+    p.vy *= Math.pow(0.95, dt);
+    p.life -= 0.02 * crowdDecay * dt;
+    if (p.life <= 0) popups.splice(i, 1);
+  }
+
+  // ── Camera — Shepard-tone infinite zoom ──
+  // player.r is bounded to [R_OCT_MIN, R_OCT_MAX] by octave shifts, so this
+  // formula only ever sees a small fixed range. The orb visibly grows within each
+  // octave, then the octave shift + flash masks the "reset." Zoom never reaches
+  // the catastrophic 0.001 regime that froze the old game.
+  const minScreenR = Math.min(W, H) * 0.028;
+  const maxScreenR = Math.min(W, H) * 0.065;
+  const octProgress = Math.min(1, (player.r - R_OCT_MIN) / (R_OCT_MAX - R_OCT_MIN));
+  const desiredScreenR = minScreenR + (maxScreenR - minScreenR) * octProgress;
+  targetZoom = desiredScreenR / player.r;
+  // If a feast/jackpot causes a sudden mass jump, or an octave shift doubles
+  // zoom, snap partway so we don't spend seconds at a wildly wrong zoom.
+  if (zoom > targetZoom * 1.5) zoom = targetZoom * 1.5;
+  if (zoom < targetZoom * 0.67) zoom = targetZoom * 0.67;
+  zoom += (targetZoom - zoom) * 0.07 * dt;
+  // Camera follows the cursor-locked player without recentering them.
+  // This preserves the exact screen position: orb screen-space == mouse position.
+  world.x = player.x - (mouse.x - W / 2) / Math.max(zoom, 0.0001);
+  world.y = player.y - (mouse.y - H / 2) / Math.max(zoom, 0.0001);
+  shakeAmount *= Math.pow(0.88, dt);
+
+  // ── Shepard-tone octave shift ──
+  // After all growth + camera math, check if we've crossed the octave boundary.
+  // This must run AFTER growth and AFTER camera/zoom settle, so the shift sees
+  // the correct state and the visual flash lands cleanly.
+  checkOctaveShift();
+  octaveFlash *= Math.pow(0.85, dt); // decay the shift flash
+
+  // ── Player trail ──
+  trail.push({ x: player.x, y: player.y, r: player.displayR, life: 1 });
+  if (trail.length > 25) trail.shift();
+  for (const t of trail) t.life -= 0.04 * dt;
+
+  // ── Achievement toasts update ──
+  for (let i = achievements_toast.length - 1; i >= 0; i--) {
+    achievements_toast[i].timer -= dt;
+    achievements_toast[i].life = Math.min(1, achievements_toast[i].timer / 30);
+    if (achievements_toast[i].timer <= 0) achievements_toast.splice(i, 1);
+  }
+
+  // ── Check achievements ──
+  checkAchievements();
+
+  // ── Display score ──
+  displayScore += (score - displayScore) * 0.2 * dt;
+  const scoreEl = document.getElementById('score');
+  scoreEl.textContent = Math.floor(displayScore);
+  scoreEl.style.transform = `scale(${1 + Math.min(combo, 10) * 0.01})`;
+  const sizeHud = document.getElementById('sizeHud');
+  if (sizeHud) {
+    // True cosmic mass: the octave system means player.r loops in [16,48], but
+    // scaleOctave tracks the real ascent. Reconstruct the true mass for display.
+    const trueMass = (player.r / R_OCT_MIN) * Math.pow(2, scaleOctave);
+    const massStr = trueMass < 100 ? trueMass.toFixed(1) : trueMass < 1000000 ? Math.floor(trueMass).toLocaleString() : trueMass.toExponential(1);
+    sizeHud.textContent = `MASS x${massStr} · ERA ${getEra()} · ${foods.length}/${foodCap} FOOD · ${threats.length}/${threatCap} BAD`;
+  }
+}
+
+// ── Render ──
+function render() {
+  ctx.fillStyle = '#06060f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Screen shake offset
+  const sx = (Math.random() - 0.5) * shakeAmount;
+  const sy = (Math.random() - 0.5) * shakeAmount;
+
+  // ── Cursor lock indicator ──
+  if (gameState === STATE.PLAYING) {
+    // Re-sync right before pixels hit the screen so slow feast frames can't leave
+    // the orb painting at a stale mouse position. This is the render-time fix for
+    // input-lag detach: the world and player are updated together to the LIVE cursor.
+    const _rz = Math.max(zoom, 0.0001);
+    const _rdx = mouse.x - W / 2;
+    const _rdy = mouse.y - H / 2;
+    player.x = world.x + _rdx / _rz;
+    player.y = world.y + _rdy / _rz;
+    world.x = player.x - _rdx / _rz;
+    world.y = player.y - _rdy / _rz;
+
+    // dot at cursor only — no leash line, because the orb should sit directly under it
+    ctx.fillStyle = 'rgba(255,255,255,0.20)';
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.translate(W / 2 + sx, H / 2 + sy);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-world.x, -world.y);
+
+  // ── Background stars (parallax, player-relative) ──
+  // Shepard-tone safe: stars wrap around the player using modulo, so they're
+  // always distributed around the orb no matter the octave/scale.
+  for (const s of bgStars) {
+    const fieldR = 2000;
+    let sx = ((s.x + player.x * s.layer) % fieldR + fieldR * 1.5) % fieldR - fieldR * 0.5;
+    let sy = ((s.y + player.y * s.layer) % fieldR + fieldR * 1.5) % fieldR - fieldR * 0.5;
+    const dx = sx - 0, dy = sy - 0;
+    // Only draw if within view
+    const viewCheck = Math.max(W, H) / 2 / Math.max(zoom, 0.0001);
+    if (Math.abs(dx) > viewCheck || Math.abs(dy) > viewCheck) continue;
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = '#7a6cff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Subtle grid ──
+  ctx.strokeStyle = 'rgba(60,50,110,0.15)';
+  ctx.lineWidth = 1 / zoom;
+  const gridSize = 100;
+  const gx0 = Math.floor((world.x - W / 2 / zoom) / gridSize) * gridSize;
+  const gx1 = world.x + W / 2 / zoom;
+  const gy0 = Math.floor((world.y - H / 2 / zoom) / gridSize) * gridSize;
+  const gy1 = world.y + H / 2 / zoom;
+  ctx.beginPath();
+  for (let x = gx0; x <= gx1; x += gridSize) {
+    ctx.moveTo(x, gy0); ctx.lineTo(x, gy1);
+  }
+  for (let y = gy0; y <= gy1; y += gridSize) {
+    ctx.moveTo(gx0, y); ctx.lineTo(gx1, y);
+  }
+  ctx.stroke();
+
+  // ── Foods ──
+  let foodsDrawn = 0;
+  const maxFoodDraws = 190;
+  for (const f of foods) {
+    if (foodsDrawn >= maxFoodDraws) break;
+    const pulse = 1 + Math.sin(f.pulse) * (f.tier === 'jackpot' ? 0.24 : f.tier === 'feast' ? 0.20 : 0.15);
+    const r = f.r * pulse;
+    const fsx = W / 2 + (f.x - world.x) * zoom;
+    const fsy = H / 2 + (f.y - world.y) * zoom;
+    const screenR = r * zoom;
+    if (fsx < -360 - screenR || fsx > W + 360 + screenR || fsy < -360 - screenR || fsy > H + 360 + screenR) continue;
+    foodsDrawn++;
+    const glow = f.glow || 3;
+    // glow
+    const glowRadius = Math.min(r * glow, 220 / Math.max(zoom, 0.0001));
+    const grd = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowRadius);
+    const glowAlpha = f.tier === 'jackpot' ? 0.76 : f.tier === 'feast' ? 0.62 : 0.48;
+    grd.addColorStop(0, `hsla(${f.hue}, 92%, 66%, ${glowAlpha})`);
+    grd.addColorStop(1, `hsla(${f.hue}, 92%, 66%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    // big-food ring / jackpot target marker
+    if (f.ring) {
+      ctx.strokeStyle = f.tier === 'jackpot' ? 'rgba(255,230,90,0.9)' : `hsla(${f.hue}, 100%, 78%, 0.55)`;
+      ctx.lineWidth = (f.tier === 'jackpot' ? 4 : 2) / zoom;
+      ctx.setLineDash(f.tier === 'jackpot' ? [] : [8 / zoom, 5 / zoom]);
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, r * 1.42, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // core
+    ctx.fillStyle = f.tier === 'jackpot' ? '#ffd24d' : `hsl(${f.hue}, 85%, 65%)`;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // inner pop
+    ctx.fillStyle = `hsla(${f.hue}, 100%, 86%, 0.82)`;
+    ctx.beginPath();
+    ctx.arc(f.x - r * 0.3, f.y - r * 0.3, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    if (f.label) {
+      ctx.fillStyle = f.tier === 'jackpot' ? '#fff5a8' : 'rgba(255,255,255,0.78)';
+      const labelSize = Math.max(11 / Math.max(zoom, 0.0001), Math.min(r * 0.22, 42 / Math.max(zoom, 0.0001)));
+      ctx.font = `900 ${labelSize}px Arial Black, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(f.label, f.x, f.y + r * 0.08);
+    }
+  }
+
+  // ── Threats (spiky menacing orbs) ──
+  for (const t of threats) {
+    const pulse = 1 + Math.sin(t.pulse) * 0.08;
+    const r = t.r * pulse;
+    const tsx0 = W / 2 + (t.x - world.x) * zoom;
+    const tsy0 = H / 2 + (t.y - world.y) * zoom;
+    const tScreenR = r * zoom;
+    if (tsx0 < -300 - tScreenR || tsx0 > W + 300 + tScreenR || tsy0 < -300 - tScreenR || tsy0 > H + 300 + tScreenR) continue;
+    // Three-state color matching the actual mechanics:
+    //   red    — can kill you (player.r < t.r * 0.92)
+    //   amber  — neutral zone, neither can harm the other (0.92×–1.08×)
+    //   green  — you can eat it (player.r > t.r * 1.08)
+    const canKill = player.r < t.r * 0.92;
+    const canEat  = player.r > t.r * 1.08;
+    const tHue = canKill ? 0 : canEat ? 130 : 45; // red / amber / green
+    const isBigger = canKill; // kept for any legacy references
+    const fading = t.spawnFade < 1;
+
+    // While spawning: pulsing outline ring instead of solid body
+    if (fading) {
+      ctx.strokeStyle = `hsla(${tHue}, 90%, 60%, ${0.4 + Math.sin(t.pulse * 4) * 0.3})`;
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, r * 1.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      continue; // don't draw the body yet
+    }
+
+    // glow
+    const grd = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 2.5);
+    grd.addColorStop(0, `hsla(${tHue}, 90%, 50%, 0.4)`);
+    grd.addColorStop(1, `hsla(${tHue}, 90%, 50%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // spikes
+    ctx.fillStyle = `hsl(${tHue}, 75%, 40%)`;
+    ctx.beginPath();
+    const spikes = 8;
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2 + t.spikePhase;
+      const sr = i % 2 === 0 ? r * 1.35 : r * 1.0;
+      const px = t.x + Math.cos(a) * sr;
+      const py = t.y + Math.sin(a) * sr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = `hsl(${tHue}, 70%, 50%)`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // highlight
+    ctx.fillStyle = `hsla(${tHue}, 90%, 75%, 0.6)`;
+    ctx.beginPath();
+    ctx.arc(t.x - r * 0.3, t.y - r * 0.3, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Player trail ──
+  const phue = getPlayerHue();
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    if (t.life <= 0) continue;
+    ctx.globalAlpha = t.life * 0.3;
+    ctx.fillStyle = `hsl(${phue}, 80%, 60%)`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r * t.life * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Player ──
+  // The orb is pointer-locked. Screen shake offsets the world transform by (sx,sy),
+  // which would visually detach the orb from the cursor. Compensate by drawing the
+  // player at shake-inverted world coords so it stays glued to the mouse no matter
+  // how hard the world shakes.
+  if (player.alive || gameState === STATE.DEAD) {
+    if (player.alive) {
+      const sq = player.squash;
+      const r = player.displayR;
+      const _z = Math.max(zoom, 0.0001);
+      // Compensate for screen shake (sx,sy) so the orb never jitters off the cursor.
+      // Render-time re-sync above already keeps player/world glued to the live mouse,
+      // so only shake needs cancelling here.
+      const px = player.x - sx / _z;
+      const py = player.y - sy / _z;
+
+      // Shepard-tone: player.r is bounded [16,48], so full-quality rendering is
+      // always safe. No more cosmic LOD degradation needed.
+
+      // Outer glow (intensifies with combo, capped in screen space)
+      const glowSize = Math.min(r * (3 + Math.min(combo, 15) * 0.15), 360 / _z);
+      const grd = ctx.createRadialGradient(px, py, 0, px, py, glowSize);
+      grd.addColorStop(0, `hsla(${phue}, 90%, 65%, ${0.5 + Math.min(combo, 15) * 0.02})`);
+      grd.addColorStop(1, `hsla(${phue}, 90%, 65%, 0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(px, py, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body with squash
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(1 / sq, sq);
+      ctx.fillStyle = `hsl(${phue}, 85%, 60%)`;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      // inner gradient
+      const ig = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+      ig.addColorStop(0, `hsla(${phue}, 100%, 80%, 0.9)`);
+      ig.addColorStop(1, `hsla(${phue}, 100%, 50%, 0)`);
+      ctx.fillStyle = ig;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      // bright highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.35, r * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Octave shift flash: a brief expanding ring that masks the seamless wrap
+      if (octaveFlash > 0.01) {
+        ctx.strokeStyle = `rgba(255,255,255,${octaveFlash * 0.4})`;
+        ctx.lineWidth = (2 + octaveFlash * 6) / _z;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (1 + (1 - octaveFlash) * 2), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Outline ring (danger indicator when threat near)
+      let nearestThreat = null;
+      let nearestDist = Infinity;
+      for (const t of threats) {
+        if (player.r < t.r * 0.92) {
+          const d = Math.hypot(t.x - player.x, t.y - player.y);
+          if (d < nearestDist) { nearestDist = d; nearestThreat = t; }
+        }
+      }
+      if (nearestThreat && nearestDist < 200) {
+        const dangerAlpha = Math.max(0, 1 - nearestDist / 200);
+        ctx.strokeStyle = `rgba(255,60,80,${dangerAlpha * 0.7})`;
+        ctx.lineWidth = 3 / _z;
+        ctx.setLineDash([8 / _z, 6 / _z]);
+        ctx.beginPath();
+        ctx.arc(px, py, r + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ── Particles ──
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = `hsl(${p.hue}, 85%, 65%)`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Popups ──
+  for (const p of popups) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.font = `bold ${18 / zoom}px Arial Black, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // ── Off-screen dangerous threat radar ──
+  if (gameState === STATE.PLAYING) {
+    const cx = W / 2, cy = H / 2;
+    const margin = 42;
+    for (const t of threats) {
+      if (t.spawnFade < 1 || player.r >= t.r * 0.92) continue; // only dangerous reds
+      const tsx = cx + (t.x - player.x) * zoom;
+      const tsy = cy + (t.y - player.y) * zoom;
+      const onScreen = tsx > margin && tsx < W - margin && tsy > margin && tsy < H - margin;
+      if (onScreen) continue;
+      const dx = tsx - cx, dy = tsy - cy;
+      const ang = Math.atan2(dy, dx);
+      const edgeX = cx + Math.cos(ang) * (Math.min(W, H) * 0.5 - margin);
+      const edgeY = cy + Math.sin(ang) * (Math.min(W, H) * 0.5 - margin);
+      const proximity = 1 - Math.min(1, Math.hypot(dx, dy) / Math.max(W, H));
+      ctx.save();
+      ctx.translate(Math.max(margin, Math.min(W - margin, edgeX)), Math.max(margin, Math.min(H - margin, edgeY)));
+      ctx.rotate(ang);
+      ctx.globalAlpha = 0.55 + proximity * 0.35;
+      ctx.fillStyle = '#ff4058';
+      ctx.beginPath();
+      ctx.moveTo(18, 0);
+      ctx.lineTo(-10, -11);
+      ctx.lineTo(-5, 0);
+      ctx.lineTo(-10, 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Vignette ──
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Achievement toasts (screen space, after ctx.restore) ──
+  for (let i = 0; i < achievements_toast.length; i++) {
+    const a = achievements_toast[i];
+    const slideIn = Math.min(1, (180 - a.timer) / 15);
+    const tx = W / 2;
+    const ty = 90 + i * 55;
+    const tw = 280;
+    const th = 44;
+    ctx.globalAlpha = a.life;
+    // bg
+    ctx.fillStyle = 'rgba(20,10,40,0.92)';
+    roundRect(ctx, tx - tw/2, ty - th/2, tw, th, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd24d';
+    ctx.lineWidth = 2;
+    roundRect(ctx, tx - tw/2, ty - th/2, tw, th, 10);
+    ctx.stroke();
+    // text
+    ctx.fillStyle = '#ffd24d';
+    ctx.font = 'bold 12px Arial Black, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('★ ACHIEVEMENT UNLOCKED', tx, ty - 5);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px Arial Black, sans-serif';
+    ctx.fillText(a.name, tx, ty + 12);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ── Game loop ──
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 16.67, 3); // delta in frame units, clamped
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ── UI wiring ──
+document.getElementById('highScore').textContent = `BEST: ${bestScore}`;
+
+function renderSkins() {
+  const grid = document.getElementById('skinsGrid');
+  grid.innerHTML = '';
+  SKINS.forEach((skin, i) => {
+    const unlocked = skin.unlock();
+    const card = document.createElement('div');
+    card.className = 'skin-card' + (i === currentSkin ? ' selected' : '') + (unlocked ? '' : ' locked');
+    const orb = document.createElement('div');
+    orb.className = 'skin-orb';
+    const hue = skin.hue === -1 ? 280 : skin.hue;
+    orb.style.background = skin.hue === -1
+      ? 'linear-gradient(135deg,#8c5aff,#ff5a8c,#ffd24d,#48ff9b)'
+      : `hsl(${hue}, 85%, 60%)`;
+    orb.style.boxShadow = `0 0 18px hsla(${hue},90%,65%,0.65)`;
+    const name = document.createElement('div');
+    name.className = 'skin-name';
+    name.textContent = skin.name;
+    const lock = document.createElement('div');
+    lock.className = 'skin-lock';
+    lock.textContent = unlocked ? (i === currentSkin ? 'ACTIVE' : 'USE') : skin.desc;
+    card.appendChild(orb);
+    card.appendChild(name);
+    card.appendChild(lock);
+    card.addEventListener('click', () => {
+      if (!unlocked) return;
+      currentSkin = i;
+      localStorage.setItem('devour_skin', String(currentSkin));
+      renderSkins();
+      sfxLevel();
+    });
+    grid.appendChild(card);
+  });
+}
+
+document.getElementById('skinsBtn').addEventListener('click', () => {
+  renderSkins();
+  document.getElementById('skinsOverlay').classList.add('show');
+});
+document.getElementById('skinsCloseBtn').addEventListener('click', () => {
+  document.getElementById('skinsOverlay').classList.remove('show');
+});
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+document.getElementById('retryBtn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+document.getElementById('reviveBtn').addEventListener('click', () => {
+  initAudio();
+  revive();
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

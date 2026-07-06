@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DEVOUR</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06060f; }
+  body {
+    font-family: 'Arial Black', 'Arial', sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  canvas { display: block; position: absolute; top: 0; left: 0; }
+
+  /* ── UI Overlay ── */
+  #ui { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+  #scoreWrap {
+    position: absolute; top: 16px; left: 0; right: 0;
+    text-align: center; pointer-events: none;
+  }
+  #score {
+    font-size: 42px; font-weight: 900; letter-spacing: 2px;
+    color: #fff; text-shadow: 0 0 20px rgba(140,90,255,0.8), 0 2px 8px rgba(0,0,0,0.6);
+    transition: transform 0.12s ease-out;
+  }
+  #combo {
+    font-size: 18px; font-weight: 900; letter-spacing: 1px;
+    color: #ffd24d; text-shadow: 0 0 12px rgba(255,180,40,0.9);
+    margin-top: 2px; opacity: 0; transition: opacity 0.2s;
+    height: 22px;
+  }
+  #highScore {
+    position: absolute; top: 14px; right: 18px;
+    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+  }
+
+  /* ── Start Screen ── */
+  #startScreen, #gameOverScreen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: auto; z-index: 20;
+    background: rgba(6,6,15,0.82);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.4s;
+  }
+  #startScreen.hidden, #gameOverScreen.hidden {
+    opacity: 0; pointer-events: none;
+  }
+  .logo {
+    font-size: clamp(56px, 14vw, 120px);
+    font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #8c5aff 0%, #ff5a8c 50%, #ffd24d 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 40px rgba(140,90,255,0.6));
+    animation: logoFloat 3s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .tagline {
+    font-size: clamp(14px, 3.5vw, 18px); font-weight: 700;
+    color: rgba(255,255,255,0.6); letter-spacing: 3px;
+    margin-top: -4px; margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  .play-btn {
+    font-family: inherit;
+    font-size: 22px; font-weight: 900; letter-spacing: 2px;
+    color: #fff; text-transform: uppercase;
+    background: linear-gradient(135deg, #8c5aff, #ff5a8c);
+    border: none; border-radius: 50px;
+    padding: 18px 56px; cursor: pointer;
+    box-shadow: 0 8px 32px rgba(140,90,255,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+    pointer-events: auto;
+  }
+  .play-btn:hover { transform: scale(1.06); box-shadow: 0 12px 40px rgba(140,90,255,0.7); }
+  .play-btn:active { transform: scale(0.97); }
+  .hint {
+    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.35);
+    letter-spacing: 1px; margin-top: 28px; text-transform: uppercase;
+  }
+
+  /* ── Game Over ── */
+  #gameOverScreen .label {
+    font-size: clamp(36px, 9vw, 64px); font-weight: 900; letter-spacing: 3px;
+    color: #ff4060; text-shadow: 0 0 30px rgba(255,64,96,0.6);
+    margin-bottom: 8px;
+  }
+  #finalScore {
+    font-size: clamp(48px, 12vw, 80px); font-weight: 900;
+    color: #fff; text-shadow: 0 0 24px rgba(140,90,255,0.7);
+  }
+  #newRecord {
+    font-size: 16px; font-weight: 900; letter-spacing: 2px;
+    color: #ffd24d; text-shadow: 0 0 12px rgba(255,180,40,0.8);
+    height: 20px; margin-bottom: 8px; text-transform: uppercase;
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .stat-row {
+    font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.5);
+    letter-spacing: 1px; margin-bottom: 32px; text-transform: uppercase;
+  }
+
+  /* ── Ad-reward style buttons ── */
+  .reward-btn {
+    font-family: inherit;
+    font-size: 15px; font-weight: 900; letter-spacing: 1px;
+    color: #ffd24d; text-transform: uppercase;
+    background: rgba(255,210,77,0.12);
+    border: 2px solid rgba(255,210,77,0.4);
+    border-radius: 50px;
+    padding: 12px 28px; cursor: pointer;
+    margin-bottom: 16px; pointer-events: auto;
+    transition: all 0.15s;
+  }
+  .reward-btn:hover { background: rgba(255,210,77,0.2); border-color: #ffd24d; }
+  .reward-btn:active { transform: scale(0.96); }
+
+  /* ── Skins button + overlay ── */
+  .skins-btn {
+    font-family: inherit;
+    font-size: 13px; font-weight: 900; letter-spacing: 2px;
+    color: rgba(255,255,255,0.5); text-transform: uppercase;
+    background: transparent; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50px; padding: 10px 24px; cursor: pointer;
+    margin-top: 16px; pointer-events: auto;
+    transition: all 0.15s;
+  }
+  .skins-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+  #skinsOverlay {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 30; background: rgba(6,6,15,0.92);
+    backdrop-filter: blur(8px);
+  }
+  #skinsOverlay.show { display: flex; }
+  .skins-title {
+    font-size: 28px; font-weight: 900; letter-spacing: 3px;
+    color: #fff; margin-bottom: 6px;
+  }
+  .skins-sub {
+    font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 1px;
+    margin-bottom: 30px; text-transform: uppercase;
+  }
+  .skins-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; max-width: 380px; margin-bottom: 30px;
+  }
+  .skin-card {
+    width: 72px; height: 90px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 12px; border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .skin-card:hover { border-color: rgba(255,255,255,0.3); transform: translateY(-2px); }
+  .skin-card.selected { border-color: #8c5aff; background: rgba(140,90,255,0.15); box-shadow: 0 0 20px rgba(140,90,255,0.3); }
+  .skin-card.locked { opacity: 0.35; cursor: not-allowed; }
+  .skin-orb {
+    width: 36px; height: 36px; border-radius: 50%;
+    margin-bottom: 6px;
+  }
+  .skin-name {
+    font-size: 9px; font-weight: 900; letter-spacing: 1px;
+    color: rgba(255,255,255,0.7); text-transform: uppercase;
+  }
+  .skin-lock {
+    font-size: 8px; color: rgba(255,255,255,0.4); margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div id="scoreWrap">
+    <div id="score">0</div>
+    <div id="combo"></div>
+  </div>
+  <div id="highScore">BEST: 0</div>
+</div>
+
+<div id="startScreen">
+  <div class="logo">DEVOUR</div>
+  <div class="tagline">Eat. Grow. Survive.</div>
+  <button class="play-btn" id="playBtn">PLAY</button>
+  <div class="hint" id="startHint">Move your mouse or drag to move</div>
+  <button class="skins-btn" id="skinsBtn">🏁 SKINS</button>
+</div>
+
+<div id="skinsOverlay">
+  <div class="skins-title">SKINS</div>
+  <div class="skins-sub">Unlock by playing</div>
+  <div class="skins-grid" id="skinsGrid"></div>
+  <button class="play-btn" id="skinsCloseBtn" style="font-size:16px;padding:12px 36px;">BACK</button>
+</div>
+
+<div id="gameOverScreen" class="hidden">
+  <div class="label">DEVOURED</div>
+  <div id="newRecord"></div>
+  <div id="finalScore">0</div>
+  <div class="stat-row" id="statRow">Size 1 · 0s</div>
+  <button class="reward-btn" id="reviveBtn">▶ WATCH AD TO REVIVE</button>
+  <button class="play-btn" id="retryBtn">RETRY</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DEVOUR — arena devourer. Single-file HTML5 Canvas game.
+// ═══════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, DPR;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Input ──
+const mouse = { x: W/2, y: H/2, active: false };
+function setMouse(clientX, clientY) {
+  mouse.x = clientX;
+  mouse.y = clientY;
+  mouse.active = true;
+}
+canvas.addEventListener('mousemove', e => setMouse(e.clientX, e.clientY));
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  setMouse(t.clientX, t.clientY);
+}, { passive: false });
+canvas.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  setMouse(t.clientX, t.clientY);
+}, { passive: true });
+
+// ── Audio (Web Audio synth — tiny SFX, no files) ──
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (slide) osc.frequency.exponentialRampToValueAtTime(freq + slide, audioCtx.currentTime + dur);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
+function sfxEat(combo) {
+  const base = 300 + Math.min(combo, 20) * 40;
+  playTone(base, 0.1, 'square', 0.08, base * 0.8);
+  setTimeout(() => playTone(base * 1.5, 0.08, 'sine', 0.06), 30);
+}
+function sfxDeath() {
+  playTone(200, 0.3, 'sawtooth', 0.2, -150);
+  setTimeout(() => playTone(120, 0.4, 'sawtooth', 0.15, -80), 80);
+}
+function sfxLevel() {
+  playTone(523, 0.1, 'sine', 0.1);
+  setTimeout(() => playTone(659, 0.1, 'sine', 0.1), 60);
+  setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 120);
+}
+// (Note: per user prefs, SFX is fine; only procedural *music* is rejected.)
+
+// ── Game State ──
+const STATE = { MENU: 0, PLAYING: 1, DEAD: 2 };
+let gameState = STATE.MENU;
+let revivesUsed = 0;
+
+const world = { x: 0, y: 0 }; // camera offset
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  r: 16,
+  displayR: 16,
+  hue: 265,
+  squash: 1, // squash & stretch factor
+  alive: true,
+};
+
+let foods = [];
+let threats = [];
+let particles = [];
+let popups = [];
+let trail = [];
+let achievements_toast = [];
+let bgStars = [];
+
+let score = 0;
+let displayScore = 0;
+let combo = 0;
+let comboTimer = 0;
+let bestScore = parseInt(localStorage.getItem('devour_best') || '0');
+let bestSize = parseInt(localStorage.getItem('devour_bestsize') || '1');
+let startTime = 0;
+let elapsedTime = 0;
+let spawnTimer = 0;
+let threatSpawnTimer = 0;
+let shakeAmount = 0;
+let zoom = 1;
+let targetZoom = 1;
+let level = 1;
+
+// ── Skin System (unlockable cosmetics = retention) ──
+const SKINS = [
+  { name: 'VOID',    hue: 265, glow: 140, unlock: () => true,                    desc: 'Default' },
+  { name: 'EMBER',   hue: 20,  glow: 200, unlock: () => bestScore >= 100,        desc: 'Score 100' },
+  { name: 'TOXIC',   hue: 130, glow: 160, unlock: () => bestScore >= 500,        desc: 'Score 500' },
+  { name: 'GOLD',    hue: 45,  glow: 220, unlock: () => bestScore >= 1000,       desc: 'Score 1000' },
+  { name: 'ICE',     hue: 195, glow: 180, unlock: () => bestSize >= 3,           desc: 'Size 3' },
+  { name: 'BLOOD',   hue: 350, glow: 240, unlock: () => bestScore >= 2500,       desc: 'Score 2500' },
+  { name: 'PRISM',   hue: -1,  glow: 260, unlock: () => bestScore >= 5000,       desc: 'Score 5000' }, // rainbow
+];
+let currentSkin = parseInt(localStorage.getItem('devour_skin') || '0');
+
+// ── Achievements ──
+const ACHIEVEMENTS = [
+  { id: 'first_eat',   name: 'FIRST BITE',      check: () => score >= 1 },
+  { id: 'combo_10',    name: 'COMBO MASTER',     check: () => combo >= 10 },
+  { id: 'combo_25',    name: 'COMBO GOD',        check: () => combo >= 25 },
+  { id: 'level_5',     name: 'GROWING UP',       check: () => level >= 5 },
+  { id: 'level_10',    name: 'APEX PREDATOR',    check: () => level >= 10 },
+  { id: 'score_500',   name: 'HUNGRY',           check: () => score >= 500 },
+  { id: 'score_1000',  name: 'RAVENOUS',         check: () => score >= 1000 },
+  { id: 'threat_eat',  name: 'PREDATOR',         check: () => threatsEaten >= 1 },
+  { id: 'threat_5',    name: 'APEX',             check: () => threatsEaten >= 5 },
+];
+let threatsEaten = 0;
+let unlockedAchievements = JSON.parse(localStorage.getItem('devour_ach') || '[]');
+
+function checkAchievements() {
+  for (const a of ACHIEVEMENTS) {
+    if (!unlockedAchievements.includes(a.id) && a.check()) {
+      unlockedAchievements.push(a.id);
+      localStorage.setItem('devour_ach', JSON.stringify(unlockedAchievements));
+      achievements_toast.push({ name: a.name, life: 1, timer: 180 });
+      sfxLevel();
+    }
+  }
+}
+
+function getPlayerHue() {
+  const skin = SKINS[currentSkin];
+  if (skin.hue === -1) return (performance.now() / 20) % 360; // rainbow
+  return skin.hue;
+}
+function getPlayerGlow() {
+  return SKINS[currentSkin].glow;
+}
+
+// ── Background stars (parallax) ──
+function initStars() {
+  bgStars = [];
+  for (let i = 0; i < 120; i++) {
+    bgStars.push({
+      x: (Math.random() - 0.5) * 4000,
+      y: (Math.random() - 0.5) * 4000,
+      r: Math.random() * 1.5 + 0.3,
+      a: Math.random() * 0.5 + 0.2,
+      layer: Math.random() * 0.5 + 0.3,
+    });
+  }
+}
+initStars();
+
+// ── Spawning ──
+const FOOD_COLORS = [180, 200, 280, 320, 40, 140]; // hues
+
+function spawnFood() {
+  const angle = Math.random() * Math.PI * 2;
+  // Spawn across the WHOLE visible area, not just a fixed ring (scales with zoom)
+  const halfScreen = Math.max(W, H) / 2 / zoom;
+  const dist = 100 + Math.random() * Math.max(250, halfScreen * 1.4);
+  // Food GROWS WITH the player so it's always a visible, meaningful target —
+  // never a sub-pixel crumb when you're huge.
+  const baseR = Math.max(7, player.r * (0.09 + Math.random() * 0.06));
+  foods.push({
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    r: baseR,
+    hue: FOOD_COLORS[Math.floor(Math.random() * FOOD_COLORS.length)],
+    vx: (Math.random() - 0.5) * 0.4,
+    vy: (Math.random() - 0.5) * 0.4,
+    pulse: Math.random() * Math.PI * 2,
+  });
+}
+
+function spawnThreat() {
+  const angle = Math.random() * Math.PI * 2;
+  // Spawn JUST past the visible screen edge so you always see them appear
+  const halfScreen = Math.max(W, H) / 2 / zoom;
+  const dist = halfScreen + player.r + 50;
+  // Mixed threat sizes: ~40% smaller than you (edible prey to hunt),
+  // ~50% slightly bigger (dangerous but dodgeable), ~10% much bigger (avoid)
+  const roll = Math.random();
+  let sizeRatio;
+  if (roll < 0.40) {
+    sizeRatio = 0.45 + Math.random() * 0.35;
+  } else if (roll < 0.90) {
+    sizeRatio = 1.08 + Math.random() * 0.22;
+  } else {
+    sizeRatio = 1.5 + Math.random() * 0.3;
+  }
+  const threatR = player.r * sizeRatio;
+  const baseThreatSpeed = 0.7 + Math.random() * 0.4;
+  const speedMod = sizeRatio < 1 ? 1.1 : (2 - sizeRatio);
+  threats.push({
+    x: player.x + Math.cos(angle) * dist,
+    y: player.y + Math.sin(angle) * dist,
+    r: threatR,
+    vx: 0, vy: 0,
+    hue: 0,
+    pulse: Math.random() * Math.PI * 2,
+    speed: baseThreatSpeed * Math.max(0.4, speedMod),
+    huntDelay: 70 + Math.random() * 50,
+    life: 0,
+    spawnFade: 0, // 0→1, harmless until 1
+    spikePhase: Math.random() * Math.PI * 2,
+  });
+}
+
+function spawnParticles(x, y, hue, count, speed) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * speed + speed * 0.3;
+    particles.push({
+      x, y,
+      vx: Math.cos(a) * s,
+      vy: Math.sin(a) * s,
+      r: Math.random() * 3 + 1,
+      hue: hue + (Math.random() - 0.5) * 30,
+      life: 1,
+      decay: 0.02 + Math.random() * 0.02,
+    });
+  }
+}
+
+function spawnPopup(x, y, text, color) {
+  popups.push({ x, y, text, color, life: 1, vy: -1.2 });
+}
+
+// ── Game lifecycle ──
+function startGame() {
+  gameState = STATE.PLAYING;
+  player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
+  player.r = 16; player.displayR = 16;
+  player.squash = 1; player.alive = true;
+  foods = []; threats = []; particles = []; popups = []; trail = []; achievements_toast = [];
+  score = 0; displayScore = 0; combo = 0; comboTimer = 0;
+  spawnTimer = 0; threatSpawnTimer = 0;
+  shakeAmount = 0; zoom = 1; targetZoom = 1; level = 1;
+  threatsEaten = 0;
+  startTime = performance.now();
+  revivesUsed = 0;
+  // initial food
+  for (let i = 0; i < 50; i++) spawnFood();
+  for (let i = 0; i < 3; i++) spawnThreat();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameOverScreen').classList.add('hidden');
+}
+
+function gameOver() {
+  if (gameState !== STATE.PLAYING) return;
+  gameState = STATE.DEAD;
+  player.alive = false;
+  shakeAmount = 30;
+  spawnParticles(player.x, player.y, getPlayerHue(), 40, 8);
+  sfxDeath();
+  const size = Math.floor(player.r / 16);
+  elapsedTime = (performance.now() - startTime) / 1000;
+
+  // High scores
+  let newRecord = false;
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('devour_best', String(bestScore));
+    newRecord = true;
+  }
+  if (size > bestSize) {
+    bestSize = size;
+    localStorage.setItem('devour_bestsize', String(bestSize));
+    newRecord = true;
+  }
+
+  // Show game over screen after a brief delay for impact
+  setTimeout(() => {
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('newRecord').textContent = newRecord ? '★ NEW RECORD ★' : '';
+    document.getElementById('statRow').textContent = `Size ${size} · ${Math.floor(elapsedTime)}s`;
+    const reviveBtn = document.getElementById('reviveBtn');
+    reviveBtn.style.display = revivesUsed < 1 ? 'block' : 'none';
+    document.getElementById('gameOverScreen').classList.remove('hidden');
+    document.getElementById('highScore').textContent = `BEST: ${bestScore}`;
+  }, 700);
+}
+
+function revive() {
+  if (gameState !== STATE.DEAD) return;
+  revivesUsed++;
+  gameState = STATE.PLAYING;
+  player.alive = true;
+  // Clear nearby threats
+  threats = threats.filter(t => {
+    const dx = t.x - player.x, dy = t.y - player.y;
+    return Math.hypot(dx, dy) > 500;
+  });
+  // Shrink slightly so it's fair
+  player.r = Math.max(16, player.r * 0.7);
+  player.displayR = player.r;
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  initAudio();
+}
+
+// ── Update ──
+function update(dt) {
+  if (gameState !== STATE.PLAYING) return;
+
+  elapsedTime = (performance.now() - startTime) / 1000;
+
+  // ── Player movement — analog stick feel ──
+  // Dead zone in center = STOP. Push past it and speed ramps smoothly
+  // with distance (like moving a thumbstick). Full speed at edge of screen.
+  const targetX = mouse.x - W / 2 + player.x;
+  const targetY = mouse.y - H / 2 + player.y;
+  const dx = targetX - player.x;
+  const dy = targetY - player.y;
+  const dist = Math.hypot(dx, dy);
+  // ── Player movement — responsive, scales with size ──
+  // Dead zone = fraction of the orb's on-screen radius (bigger orb = bigger dead zone)
+  // Speed compensates for zoom so it feels consistent at any size
+  const screenRadius = player.displayR * zoom; // orb radius in screen px
+  const deadZone = Math.max(8, screenRadius * 0.6); // ~60% of orb = stop
+  const rampRange = screenRadius * 1.5; // how far to push before full speed
+  const visualSpeed = 4.5 / zoom; // compensate zoom so visual speed is constant
+  let tvx = 0, tvy = 0;
+  if (dist > deadZone) {
+    const ramp = Math.min(1, (dist - deadZone) / rampRange);
+    tvx = (dx / dist) * visualSpeed * ramp;
+    tvy = (dy / dist) * visualSpeed * ramp;
+  }
+  player.vx = tvx;
+  player.vy = tvy;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  // ── Squash recovery ──
+  player.squash += (1 - player.squash) * 0.15 * dt;
+  player.displayR += (player.r - player.displayR) * 0.2 * dt;
+
+  // ── Combo decay ──
+  if (combo > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) {
+      combo = 0;
+      document.getElementById('combo').style.opacity = '0';
+    }
+  }
+
+  // ── Food spawning ── (count scales with view so the field stays full)
+  spawnTimer -= dt;
+  const viewHalf = Math.max(W, H) / 2 / zoom;
+  const foodCap = Math.min(240, 60 + level * 4 + Math.floor(viewHalf / 40));
+  if (spawnTimer <= 0 && foods.length < foodCap) {
+    spawnFood();
+    spawnTimer = 8 + Math.random() * 15;
+  }
+
+  // ── Threat spawning ──
+  threatSpawnTimer -= dt;
+  if (threatSpawnTimer <= 0) {
+    spawnThreat();
+    threatSpawnTimer = Math.max(60, 180 - level * 8);
+  }
+
+  // ── Update foods ──
+  for (let i = foods.length - 1; i >= 0; i--) {
+    const f = foods[i];
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+    f.pulse += 0.05 * dt;
+
+    const fdx = f.x - player.x, fdy = f.y - player.y;
+    const dist = Math.hypot(fdx, fdy);
+
+    // Cull only once well past the visible screen edge (scales with zoom)
+    if (dist > viewHalf + 400) { foods.splice(i, 1); continue; }
+
+    // Eat check
+    if (dist < player.r + f.r) {
+      foods.splice(i, 1);
+      combo++;
+      comboTimer = 90;
+      const points = combo;
+      score += points;
+      // Grow
+      player.r += 0.4 + combo * 0.08;
+      player.squash = 0.7; // squash effect
+      // Juice
+      spawnParticles(f.x, f.y, f.hue, 6 + Math.min(combo, 10), 4);
+      spawnPopup(f.x, f.y - f.r, '+' + points, `hsl(${f.hue}, 80%, 70%)`);
+      sfxEat(combo);
+      // Show combo
+      if (combo >= 2) {
+        const el = document.getElementById('combo');
+        el.textContent = combo + 'x COMBO';
+        el.style.opacity = '1';
+      }
+      // Level up (visual/feedback only — zoom is now continuous)
+      const newLevel = Math.floor((player.r - 16) / 12) + 1;
+      if (newLevel > level) {
+        level = newLevel;
+        sfxLevel();
+        spawnParticles(player.x, player.y, getPlayerHue(), 20, 6);
+        spawnPopup(player.x, player.y - player.r - 20, 'LEVEL ' + level + '!', '#ffd24d');
+      }
+    }
+  }
+
+  // ── Update threats ──
+  for (let i = threats.length - 1; i >= 0; i--) {
+    const t = threats[i];
+    t.life += dt;
+    t.pulse += 0.04 * dt;
+    t.spikePhase += 0.03 * dt;
+
+    const tdx = player.x - t.x, tdy = player.y - t.y;
+    const dist = Math.hypot(tdx, tdy);
+
+    // Cull only once well past the visible screen edge (scales with zoom)
+    if (dist > viewHalf + 600) { threats.splice(i, 1); continue; }
+
+    // Spawn fade-in (harmless until fully materialized)
+    if (t.spawnFade < 1) {
+      t.spawnFade = Math.min(1, t.spawnFade + 0.02 * dt);
+    }
+
+    // Start chasing after delay AND after fully spawned
+    if (t.life > t.huntDelay && t.spawnFade >= 1) {
+      const dirX = tdx / dist;
+      const dirY = tdy / dist;
+      t.vx += dirX * t.speed * 0.04 * dt;
+      t.vy += dirY * t.speed * 0.04 * dt;
+      const sp = Math.hypot(t.vx, t.vy);
+      const maxSp = t.speed;
+      if (sp > maxSp) { t.vx = (t.vx / sp) * maxSp; t.vy = (t.vy / sp) * maxSp; }
+    }
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+
+    // Death check — only if threat is bigger AND fully spawned in
+    if (t.spawnFade >= 1 && player.r < t.r * 0.92 && dist < player.r + t.r - 4) {
+      gameOver();
+      return;
+    }
+
+    // Eat threat if player is bigger!
+    if (t.spawnFade >= 1 && player.r > t.r * 1.08 && dist < player.r + t.r * 0.6) {
+      threats.splice(i, 1);
+      const points = 10 + Math.floor(t.r / 4);
+      score += points;
+      player.r += t.r * 0.15;
+      player.squash = 0.6;
+      threatsEaten++;
+      spawnParticles(t.x, t.y, 20, 25, 7);
+      spawnPopup(t.x, t.y - t.r, '+' + points + ' CHOMP!', '#ff6040');
+      sfxEat(combo + 5);
+      shakeAmount = Math.max(shakeAmount, 8);
+    }
+  }
+
+  // ── Update particles ──
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= Math.pow(0.94, dt);
+    p.vy *= Math.pow(0.94, dt);
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ── Update popups ──
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.y += p.vy * dt;
+    p.vy *= Math.pow(0.95, dt);
+    p.life -= 0.02 * dt;
+    if (p.life <= 0) popups.splice(i, 1);
+  }
+
+  // ── Camera — infinite zoom-out. NO floor. ──
+  // The orb is capped at a fixed fraction of the viewport (~22% of the short
+  // screen dimension). As you grow without bound the camera keeps pulling back,
+  // so you NEVER outgrow the viewing area — the world is infinite forever.
+  // Gentle sqrt curve early on (feels like progressive zoom-out), then a hard
+  // size cap takes over at huge sizes and holds the orb at a constant on-screen
+  // size while everything else scales around you.
+  const maxScreenR = Math.min(W, H) * 0.11; // orb radius cap in screen px (÷2 = 22% diameter)
+  const curveZoom = Math.sqrt(16 / player.r);
+  const capZoom = maxScreenR / player.r;
+  targetZoom = Math.min(1.0, curveZoom, capZoom);
+  zoom += (targetZoom - zoom) * 0.04 * dt;
+  world.x = player.x;
+  world.y = player.y;
+  shakeAmount *= Math.pow(0.88, dt);
+
+  // ── Player trail ──
+  trail.push({ x: player.x, y: player.y, r: player.displayR, life: 1 });
+  if (trail.length > 25) trail.shift();
+  for (const t of trail) t.life -= 0.04 * dt;
+
+  // ── Achievement toasts update ──
+  for (let i = achievements_toast.length - 1; i >= 0; i--) {
+    achievements_toast[i].timer -= dt;
+    achievements_toast[i].life = Math.min(1, achievements_toast[i].timer / 30);
+    if (achievements_toast[i].timer <= 0) achievements_toast.splice(i, 1);
+  }
+
+  // ── Check achievements ──
+  checkAchievements();
+
+  // ── Display score ──
+  displayScore += (score - displayScore) * 0.2 * dt;
+  const scoreEl = document.getElementById('score');
+  scoreEl.textContent = Math.floor(displayScore);
+  scoreEl.style.transform = `scale(${1 + Math.min(combo, 10) * 0.01})`;
+}
+
+// ── Render ──
+function render() {
+  ctx.fillStyle = '#06060f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Screen shake offset
+  const sx = (Math.random() - 0.5) * shakeAmount;
+  const sy = (Math.random() - 0.5) * shakeAmount;
+
+  // ── Dead zone indicator (scales with orb's on-screen size) ──
+  if (gameState === STATE.PLAYING) {
+    const scrR = player.displayR * zoom;
+    const dz = Math.max(8, scrR * 0.6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, dz, 0, Math.PI * 2);
+    ctx.stroke();
+    // dot at cursor
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.translate(W / 2 + sx, H / 2 + sy);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-world.x, -world.y);
+
+  // ── Background stars ──
+  for (const s of bgStars) {
+    ctx.globalAlpha = s.a;
+    ctx.fillStyle = '#7a6cff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Subtle grid ──
+  ctx.strokeStyle = 'rgba(60,50,110,0.15)';
+  ctx.lineWidth = 1 / zoom;
+  const gridSize = 100;
+  const gx0 = Math.floor((world.x - W / 2 / zoom) / gridSize) * gridSize;
+  const gx1 = world.x + W / 2 / zoom;
+  const gy0 = Math.floor((world.y - H / 2 / zoom) / gridSize) * gridSize;
+  const gy1 = world.y + H / 2 / zoom;
+  ctx.beginPath();
+  for (let x = gx0; x <= gx1; x += gridSize) {
+    ctx.moveTo(x, gy0); ctx.lineTo(x, gy1);
+  }
+  for (let y = gy0; y <= gy1; y += gridSize) {
+    ctx.moveTo(gx0, y); ctx.lineTo(gx1, y);
+  }
+  ctx.stroke();
+
+  // ── Foods ──
+  for (const f of foods) {
+    const pulse = 1 + Math.sin(f.pulse) * 0.15;
+    const r = f.r * pulse;
+    // glow
+    const grd = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r * 3);
+    grd.addColorStop(0, `hsla(${f.hue}, 90%, 65%, 0.5)`);
+    grd.addColorStop(1, `hsla(${f.hue}, 90%, 65%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+    // core
+    ctx.fillStyle = `hsl(${f.hue}, 85%, 65%)`;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // highlight
+    ctx.fillStyle = `hsla(${f.hue}, 100%, 85%, 0.8)`;
+    ctx.beginPath();
+    ctx.arc(f.x - r * 0.3, f.y - r * 0.3, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Threats (spiky menacing orbs) ──
+  for (const t of threats) {
+    const pulse = 1 + Math.sin(t.pulse) * 0.08;
+    const r = t.r * pulse;
+    const isBigger = player.r < t.r * 0.92;
+    const tHue = isBigger ? 0 : 130; // red if dangerous, green if edible
+    const fading = t.spawnFade < 1;
+
+    // While spawning: pulsing outline ring instead of solid body
+    if (fading) {
+      ctx.strokeStyle = `hsla(${tHue}, 90%, 60%, ${0.4 + Math.sin(t.pulse * 4) * 0.3})`;
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, r * 1.3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      continue; // don't draw the body yet
+    }
+
+    // glow
+    const grd = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 2.5);
+    grd.addColorStop(0, `hsla(${tHue}, 90%, 50%, 0.4)`);
+    grd.addColorStop(1, `hsla(${tHue}, 90%, 50%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // spikes
+    ctx.fillStyle = `hsl(${tHue}, 75%, 40%)`;
+    ctx.beginPath();
+    const spikes = 8;
+    for (let i = 0; i < spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2 + t.spikePhase;
+      const sr = i % 2 === 0 ? r * 1.35 : r * 1.0;
+      const px = t.x + Math.cos(a) * sr;
+      const py = t.y + Math.sin(a) * sr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // body
+    ctx.fillStyle = `hsl(${tHue}, 70%, 50%)`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // highlight
+    ctx.fillStyle = `hsla(${tHue}, 90%, 75%, 0.6)`;
+    ctx.beginPath();
+    ctx.arc(t.x - r * 0.3, t.y - r * 0.3, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Player trail ──
+  const phue = getPlayerHue();
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i];
+    if (t.life <= 0) continue;
+    ctx.globalAlpha = t.life * 0.3;
+    ctx.fillStyle = `hsl(${phue}, 80%, 60%)`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, t.r * t.life * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Player ──
+  if (player.alive || gameState === STATE.DEAD) {
+    if (player.alive) {
+      const sq = player.squash;
+      const r = player.displayR;
+      // Outer glow (intensifies with combo)
+      const glowSize = r * (3 + Math.min(combo, 15) * 0.15);
+      const grd = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, glowSize);
+      grd.addColorStop(0, `hsla(${phue}, 90%, 65%, ${0.5 + Math.min(combo, 15) * 0.02})`);
+      grd.addColorStop(1, `hsla(${phue}, 90%, 65%, 0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, glowSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body with squash
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.scale(1 / sq, sq);
+      ctx.fillStyle = `hsl(${phue}, 85%, 60%)`;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      // inner gradient
+      const ig = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+      ig.addColorStop(0, `hsla(${phue}, 100%, 80%, 0.9)`);
+      ig.addColorStop(1, `hsla(${phue}, 100%, 50%, 0)`);
+      ctx.fillStyle = ig;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      // bright highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.35, r * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Outline ring (danger indicator when threat near)
+      let nearestThreat = null;
+      let nearestDist = Infinity;
+      for (const t of threats) {
+        if (player.r < t.r * 0.92) {
+          const d = Math.hypot(t.x - player.x, t.y - player.y);
+          if (d < nearestDist) { nearestDist = d; nearestThreat = t; }
+        }
+      }
+      if (nearestThreat && nearestDist < 200) {
+        const dangerAlpha = Math.max(0, 1 - nearestDist / 200);
+        ctx.strokeStyle = `rgba(255,60,80,${dangerAlpha * 0.7})`;
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([8 / zoom, 6 / zoom]);
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, r + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ── Particles ──
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = `hsl(${p.hue}, 85%, 65%)`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── Popups ──
+  for (const p of popups) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.font = `bold ${18 / zoom}px Arial Black, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // ── Vignette ──
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Achievement toasts (screen space, after ctx.restore) ──
+  for (let i = 0; i < achievements_toast.length; i++) {
+    const a = achievements_toast[i];
+    const slideIn = Math.min(1, (180 - a.timer) / 15);
+    const tx = W / 2;
+    const ty = 90 + i * 55;
+    const tw = 280;
+    const th = 44;
+    ctx.globalAlpha = a.life;
+    // bg
+    ctx.fillStyle = 'rgba(20,10,40,0.92)';
+    roundRect(ctx, tx - tw/2, ty - th/2, tw, th, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd24d';
+    ctx.lineWidth = 2;
+    roundRect(ctx, tx - tw/2, ty - th/2, tw, th, 10);
+    ctx.stroke();
+    // text
+    ctx.fillStyle = '#ffd24d';
+    ctx.font = 'bold 12px Arial Black, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('★ ACHIEVEMENT UNLOCKED', tx, ty - 5);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px Arial Black, sans-serif';
+    ctx.fillText(a.name, tx, ty + 12);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ── Game loop ──
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 16.67, 3); // delta in frame units, clamped
+  lastTime = now;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// ── UI wiring ──
+document.getElementById('highScore').textContent = `BEST: ${bestScore}`;
+document.getElementById('playBtn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+document.getElementById('retryBtn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+document.getElementById('reviveBtn').addEventListener('click', () => {
+  initAudio();
+  revive();
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
