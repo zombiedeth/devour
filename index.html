@@ -278,68 +278,6 @@ let lastEatSfxAt = 0;
 let audioUnlockInFlight = false;
 let audioUnlocked = false;
 const PRIME_BEEP = 'data:audio/wav;base64,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';
-const nativeToneCache = new Map();
-
-function encodeWav(samples, sampleRate = 8000) {
-  const bytesPerSample = 2;
-  const blockAlign = bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = samples.length * bytesPerSample;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-  let offset = 0;
-  const writeStr = (s) => { for (let i = 0; i < s.length; i++) view.setUint8(offset++, s.charCodeAt(i)); };
-  const writeU16 = (v) => { view.setUint16(offset, v, true); offset += 2; };
-  const writeU32 = (v) => { view.setUint32(offset, v, true); offset += 4; };
-  writeStr('RIFF');
-  writeU32(36 + dataSize);
-  writeStr('WAVEfmt ');
-  writeU32(16);
-  writeU16(1);
-  writeU16(1);
-  writeU32(sampleRate);
-  writeU32(byteRate);
-  writeU16(blockAlign);
-  writeU16(16);
-  writeStr('data');
-  writeU32(dataSize);
-  for (let i = 0; i < samples.length; i++, offset += 2) view.setInt16(offset, samples[i], true);
-  let bin = '';
-  const u8 = new Uint8Array(buffer);
-  for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
-  return 'data:audio/wav;base64,' + btoa(bin);
-}
-
-function buildToneDataUri(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  const key = `${freq}|${dur}|${type}|${vol}|${slide}`;
-  if (nativeToneCache.has(key)) return nativeToneCache.get(key);
-  const sampleRate = 8000;
-  const n = Math.max(1, Math.round(sampleRate * dur));
-  const samples = new Int16Array(n);
-  const attack = Math.max(1, Math.floor(sampleRate * 0.01));
-  const release = Math.max(1, Math.floor(sampleRate * 0.02));
-  for (let i = 0; i < n; i++) {
-    const t = i / sampleRate;
-    const localFreq = slide ? (freq + (slide * (i / Math.max(1, n - 1)))) : freq;
-    const phase = 2 * Math.PI * localFreq * t;
-    let s = Math.sin(phase);
-    if (type === 'square') s = s >= 0 ? 1 : -1;
-    else if (type === 'sawtooth') s = 2 * (t * localFreq - Math.floor(0.5 + t * localFreq));
-    const env = i < attack ? i / attack : i > n - release ? Math.max(0, (n - i) / release) : 1;
-    samples[i] = Math.max(-32767, Math.min(32767, Math.round(s * env * vol * 32767)));
-  }
-  const uri = encodeWav(samples, sampleRate);
-  nativeToneCache.set(key, uri);
-  return uri;
-}
-
-function playNativeTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  try {
-    const audio = new Audio(buildToneDataUri(freq, dur, type, vol, slide));
-    audio.volume = 1;
-    audio.play().catch(() => {});
-  } catch {}
-}
 
 function primeAudioHardware() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -383,9 +321,9 @@ function initAudio(reason = 'gesture') {
 }
 
 function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  if (!audioCtx || audioCtx.state !== 'running') {
-    playNativeTone(freq, dur, type, vol, slide);
-    return;
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') {
+    void audioCtx.resume();
   }
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
