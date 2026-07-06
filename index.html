@@ -277,6 +277,7 @@ let audioCtx;
 let lastEatSfxAt = 0;
 let audioUnlockInFlight = false;
 let audioUnlocked = false;
+const PRIME_BEEP = 'data:audio/wav;base64,UklGRqQHAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YYAHAAAAAFsAGQF4AdMAI/8q/R387/yv/0oD9wUUBhkDDf41+Q/3EPm9/rMFpgrvCu8Fl/2m9QHyyfQr/Y0HGQ/6D00Jwv2I8gDtJfD9+tIIQRMnFSoNj/7n7x3oM+s3+HsJEBdnGn0RAADM7Wbj/uXf9IQJehqqHzsWEwJB7OveluD78OkIch3iJFkbxQRM67naCduU7KgH7R//KcogFAj26t/WZdX/550FqCC1LD4kJAvt7HjXnNSs5dACqh5yLNMl1w2D77/Y/9Ny4wAAjhwBLEEnfRAp8i3ajtNW4TD9VBpkK4goExPc9MLbS9NY32P6ARibKqcplBWc93zdNNN83Zz3lBWnKZsqARhj+ljfS9PC29z0ExOIKGQrVBow/VbhjtMt2inyfRBBJwEsjhwAAHLj/9O/2IPv1w3TJXIsqh7QAqzlnNR41+3sJAs+JLUsqCCdBf/nZdVZ1mzqZAiEIswshCJkCGzqWdZl1f/nnQWoILUsPiQkC+3seNec1Kzl0AKqHnIs0yXXDYPvv9j/03LjAACOHAEsQSd9ECnyLdqO01bhMP1UGmQriCgTE9z0wttL01jfY/oBGJsqpymUFZz3fN0003zdnPeUFacpmyoBGGP6WN9L08Lb3PQTE4goZCtUGjD9VuGO0y3aKfJ9EEEnASyOHAAAcuP/07/Yg+/XDdMlciyqHtACrOWc1HjX7ewkCz4ktSyoIJ0F/+dl1VnWbOpkCIQizCyEImQIbOpZ1mXV/+edBaggtSw+JCQL7ex415zUrOXQAqoecizTJdcNg++/2P/TcuMAAI4cASxBJ30QKfIt2o7TVuEw/VQaZCuIKBMT3PTC20vTWN9j+gEYmyqnKZQVnPd83TTTfN2c95QVpymbKgEYY/pY30vTwtvc9BMTiChkK1QaMP1W4Y7TLdop8n0QQScBLI4cAABy4//Tv9iD79cN0yVyLKoe0AKs5ZzUeNft7CQLPiS1LKggnQX/52XVWdZs6mQIhCLMLIQiZAhs6lnWZdX/550FqCC1LD4kJAvt7HjXnNSs5dACqh5yLNMl1w2D77/Y/9Ny4wAAjhwBLEEnfRAp8i3ajtNW4TD9VBpkK4goExPc9MLbS9NY32P6ARibKqcplBWc93zdNNN83Zz3lBWnKZsqARhj+ljfS9PC29z0ExOIKGQrVBow/VbhjtMt2inyfRBBJwEsjhwAAHLj/9O/2IPv1w3TJXIsqh7QAqzlnNR41+3sJAs+JLUsqCCdBf/nZdVZ1mzqZAiEIswshCJkCGzqWdZl1f/nnQWoILUsPiQkC+3seNec1Kzl0AKqHnIs0yXXDYPvv9j/03LjAACOHAEsQSd9ECnyLdqO01bhMP1UGmQriCgTE9z0wttL01jfY/oBGJsqpymUFZz3fN0003zdnPeUFacpmyoBGGP6WN9L08Lb3PQTE4goZCtUGjD9VuGO0y3aKfJ9EEEnASyOHAAAcuP/07/Yg+/XDdMlciyqHtACrOWc1HjX7ewkCz4ktSyoIJ0F/+dl1VnWbOpkCIQizCyEImQIbOpZ1mXV/+edBaggtSw+JCQL7ex415zUrOXQAqoecizTJdcNg++/2P/TcuMAAI4cASxBJ30QKfIt2o7TVuEw/VQaZCuIKBMT3PTC20vTWN9j+gEYmyqnKZQVnPd83TTTfN2c95QVpymbKgEYY/pY30vTwtvc9BMTiChkK1QaMP1W4Y7TLdop8n0QQScBLI4cAABy4//Tv9iD79cN0yVyLKoe0AKs5ZzUeNft7CQLPiS1LKggnQX/52XVWdZs6mQIhCLMLIQiZAhs6lnWZdX/550FqCC1LD4kJAvt7HjXnNSs5dACqh5yLNMl1w2D77/Y/9Ny4wAAjhwBLEEnfRAp8i3ajtNW4TD9VBpkK4goExPc9MLbS9NY32P6ARibKqcplBWc93zdNNN83Zz3lBWnKZsqARhj+ljfS9PC29z0ExOIKGQrVBow/VbhjtMt2inyfRBBJwEsjhwAAHLj/9O/2IPv1w3TJXIsqh7QAqzlnNR41+3sJAs+JLUsqCCdBf/nZdVZ1mzqZAiEIswshCJkCGzqWdZl1f/nnQWoILUsPiQkC+3seNec1Kzl0AKqHnIs0yXXDYPvv9j/03LjAACOHAEsQSd9ECnyLdqO01bhMP1UGmQriCgTE9z0wttL01jfY/oBGJsqpymUFZz3fN0003zdnPeUFacpmyoBGGP6WN9L08Lb3PQTE4goZCtUGjD9VuGO0y3aKfJ9EEEnASyOHAAAcuP/07/Yg+/XDdMlciyqHtACrOWc1HjX7ewkCz4ktSyoIJ0F/+dl1VnWbOpkCIQizCyEImQIbOpZ1mXV/+edBaggtSw+JCQL7ex415zUrOXQAqoecizTJdcNg++/2P/TcuMAAI4cASxBJ30QKfIt2o7TVuEw/VQaZCuIKBMT3PTC20vTWN9j+gEYmyqnKZQVnPd83TTTfN2c95QVpymbKgEYY/pY30vTwtvc9BMTiChkK1QaMP1W4Y7TLdop8n0QQScBLI4cAABy4//Tv9iD79cN0yVyLKoe0AKs5ZzUeNft7CQLPiS1LKggnQX/52XVWdZs6mQIhCLMLIQiZAhs6lnWZdX/550FqCC1LD4kJAvt7HjXnNSs5dACqh5yLNMl1w2D77/Y/9Ny4wAAjhwBLEEnfRAp8i3ajtNW4TD9VBpkK4goExPc9MLbS9NY32P6ARibKqcplBWc93zdNNN83Zz3lBWnKZsqARhj+ljfS9PC29z0ExOIKGQrVBow/VbhjtMt2inyfRBBJwEsjhwAAHLj/9O/2IPv1w3TJXIsqh7QAqzlnNR41+3sJAs+JLUsqCCdBf/nZdVZ1mzqZAiEIswshCJkCGzqWdZl1f/nnQWoILUsPiQkC+3seNec1Kzl0AKqHnIs0yXXDYPvv9j/03LjAABgHHQrhSYUEJfymNuA1d7iWf2vGGgofiWGEdb1KN/D19HiBfsnFUclLySdEtD4qeI02hjjBvnOERoiniJaE4P7FebL3LDjXvepDuge0CC/E+n9Y+mA35TkDfbAC7kbzR7PEwAAjOxM4sDlFPUVCZYYnByME8YBi+8n5S3ncPSvBoQVRBr7EjoDWfIJ6NXoIvSQBI0SzBcfEloE8fTq6rPqJvS8ArcPPBX9ECcFTffD7b/se/Q2AQgNnBKaD58FaPmL8PPuHfUAAIcK8w/8DcUFPvs880jxCfYb/zoISQ0pDJoFzfzP9bXzOveH/iYGpgonCiAFEP48+DT2q/hF/lAEEQj9B1kEBf9++r34V/pV/r0CkgWxBUoDq/+N/Ej7OPy0/nEBMANMA/YBAABl/s39Sf5i/24A8gDVAGIABAA=';
 const nativeToneCache = new Map();
 
 function encodeWav(samples, sampleRate = 8000) {
@@ -340,68 +341,6 @@ function playNativeTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
   } catch {}
 }
 
-const NATIVE_SFX = {
-  eat1: [480, 0.08, 'square', 0.22, 340],
-  eat2: [720, 0.07, 'sine', 0.18, 160],
-  level1: [523, 0.10, 'sine', 0.22, 0],
-  level2: [659, 0.10, 'sine', 0.22, 0],
-  level3: [784, 0.14, 'sine', 0.24, 0],
-  death1: [200, 0.28, 'sawtooth', 0.26, -120],
-  death2: [120, 0.36, 'sawtooth', 0.22, -70],
-};
-const nativeSfxPools = {};
-const nativeSfxCursor = {};
-let nativeSfxUnlocked = false;
-
-function makeNativeSfxAudio(name) {
-  const def = NATIVE_SFX[name];
-  const audio = new Audio(buildToneDataUri(...def));
-  audio.preload = 'auto';
-  audio.setAttribute('playsinline', '');
-  audio.setAttribute('webkit-playsinline', '');
-  audio.load();
-  return audio;
-}
-
-function unlockNativeSfxPool() {
-  if (nativeSfxUnlocked) return;
-  nativeSfxUnlocked = true;
-  for (const name of Object.keys(NATIVE_SFX)) {
-    nativeSfxPools[name] = nativeSfxPools[name] || Array.from({ length: 3 }, () => makeNativeSfxAudio(name));
-    nativeSfxCursor[name] = 0;
-    for (const audio of nativeSfxPools[name]) {
-      try {
-        audio.volume = 0.001; // iPhone unlock tick, effectively silent — no start-screen beep.
-        audio.currentTime = 0;
-        const p = audio.play();
-        if (p) p.then(() => {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.volume = 1;
-        }).catch(() => { audio.volume = 1; });
-      } catch { audio.volume = 1; }
-    }
-  }
-}
-
-function playNativeSfx(name) {
-  const pool = nativeSfxPools[name] || (nativeSfxPools[name] = [makeNativeSfxAudio(name)]);
-  const i = nativeSfxCursor[name] = ((nativeSfxCursor[name] || 0) + 1) % pool.length;
-  const audio = pool[i];
-  try {
-    audio.pause();
-    audio.currentTime = 0;
-    audio.volume = 1;
-    audio.play().catch(() => playNativeTone(...NATIVE_SFX[name]));
-  } catch {
-    playNativeTone(...NATIVE_SFX[name]);
-  }
-}
-
-function webAudioRunning() {
-  return !!audioCtx && audioCtx.state === 'running';
-}
-
 function primeAudioHardware() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return false;
@@ -421,6 +360,11 @@ function primeAudioHardware() {
     osc.connect(gain).connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.14);
+    try {
+      const beep = new Audio(PRIME_BEEP);
+      beep.volume = 0.85;
+      beep.play().catch(() => {});
+    } catch {}
     return true;
   } catch {
     return false;
@@ -430,10 +374,9 @@ function primeAudioHardware() {
 function initAudio(reason = 'gesture') {
   if (audioUnlocked || audioUnlockInFlight) return Promise.resolve(audioUnlocked);
   audioUnlockInFlight = true;
-  unlockNativeSfxPool();
   primeAudioHardware();
   queueMicrotask(() => {
-    audioUnlocked = webAudioRunning() || nativeSfxUnlocked;
+    audioUnlocked = !!audioCtx && audioCtx.state === 'running';
     audioUnlockInFlight = false;
   });
   return Promise.resolve(true);
@@ -459,31 +402,15 @@ function sfxEat(combo) {
   const now = performance.now();
   if (now - lastEatSfxAt < 25) return; // eating cascades should not spawn 100 oscillators/frame
   lastEatSfxAt = now;
-  if (!webAudioRunning()) {
-    playNativeSfx('eat1');
-    setTimeout(() => playNativeSfx('eat2'), 30);
-    return;
-  }
   const base = 300 + Math.min(combo, 20) * 40;
   playTone(base, 0.1, 'square', 0.08, base * 0.8);
   setTimeout(() => playTone(base * 1.5, 0.08, 'sine', 0.06), 30);
 }
 function sfxDeath() {
-  if (!webAudioRunning()) {
-    playNativeSfx('death1');
-    setTimeout(() => playNativeSfx('death2'), 80);
-    return;
-  }
   playTone(200, 0.3, 'sawtooth', 0.2, -150);
   setTimeout(() => playTone(120, 0.4, 'sawtooth', 0.15, -80), 80);
 }
 function sfxLevel() {
-  if (!webAudioRunning()) {
-    playNativeSfx('level1');
-    setTimeout(() => playNativeSfx('level2'), 60);
-    setTimeout(() => playNativeSfx('level3'), 120);
-    return;
-  }
   playTone(523, 0.1, 'sine', 0.1);
   setTimeout(() => playTone(659, 0.1, 'sine', 0.1), 60);
   setTimeout(() => playTone(784, 0.15, 'sine', 0.1), 120);
