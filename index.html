@@ -267,57 +267,41 @@ canvas.addEventListener('touchstart', e => {
   setMouse(t.clientX, t.clientY);
 }, { passive: true });
 
-const primeAudioOnGesture = () => { void initAudio('gesture'); };
-['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(evt => {
+const primeAudioOnGesture = () => { initAudio('gesture'); };
+['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(evt => {
   window.addEventListener(evt, primeAudioOnGesture, { capture: true, passive: true });
 });
 
 // ── Audio (Web Audio synth — tiny SFX, no files) ──
 let audioCtx;
 let lastEatSfxAt = 0;
-let audioUnlockInFlight = false;
 let audioUnlocked = false;
 
 function primeAudioHardware() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return Promise.resolve();
+  if (!AudioContextClass) return false;
   try {
     audioCtx = audioCtx || new AudioContextClass();
-    const resumePromise = audioCtx.state === 'running' ? Promise.resolve() : audioCtx.resume();
-    const primePromise = resumePromise.then(() => {
-      // Tiny hardware prime: this spends the activation token on iPhone Safari
-      // so the first real SFX doesn't get swallowed by a pending resume.
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
-      osc.connect(gain).connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.14);
-    });
-    return Promise.race([
-      primePromise,
-      new Promise(resolve => setTimeout(resolve, 1200)),
-    ]);
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.14);
+    return true;
   } catch {
-    return Promise.resolve();
+    return !!audioCtx && audioCtx.state === 'running';
   }
 }
 
 function initAudio(reason = 'gesture') {
-  if (audioUnlocked || audioUnlockInFlight) return Promise.resolve(audioUnlocked);
-  audioUnlockInFlight = true;
-  return primeAudioHardware()
-    .then(() => {
-      audioUnlocked = !!audioCtx && audioCtx.state === 'running';
-      return audioUnlocked;
-    })
-    .catch(() => false)
-    .finally(() => {
-      audioUnlockInFlight = false;
-    });
+  primeAudioHardware();
+  audioUnlocked = !!audioCtx && audioCtx.state === 'running';
+  return audioUnlocked;
 }
 
 function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
@@ -774,6 +758,7 @@ function spawnPopup(x, y, text, color) {
 
 // ── Game lifecycle ──
 function startGame() {
+  void initAudio('start');
   gameState = STATE.PLAYING;
   player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
   player.r = 16; player.displayR = 16;
