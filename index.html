@@ -235,12 +235,9 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W, H, DPR;
-const MOBILE_PERF = new URLSearchParams(location.search).has('perf') || /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(window.innerWidth, window.innerHeight) < 900);
 
 function resize() {
-  // iPhone Safari was rendering the full game at 2x retina resolution. That
-  // quadruples canvas pixels and makes radial gradients/particles crawl.
-  DPR = MOBILE_PERF ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W * DPR;
@@ -875,9 +872,7 @@ function spawnThreat() {
 }
 
 function spawnParticles(x, y, hue, count, speed) {
-  const particleCap = MOBILE_PERF ? 180 : 900;
-  const scaledCount = MOBILE_PERF ? Math.ceil(count * 0.35) : count;
-  const allowed = Math.max(0, Math.min(scaledCount, particleCap - particles.length));
+  const allowed = Math.max(0, Math.min(count, 900 - particles.length));
   for (let i = 0; i < allowed; i++) {
     const a = Math.random() * Math.PI * 2;
     const s = Math.random() * speed + speed * 0.3;
@@ -902,7 +897,7 @@ function spawnPopup(x, y, text, color) {
   // When the screen is already busy, drop trivial +N score popups so the orb
   // stays readable during feast/jackpot cascades. Big labels (FEAST/JACKPOT/CHOMP/LEVEL) always pass.
   const trivial = /^\+\d+$/.test(text);
-  if (trivial && popups.length > (MOBILE_PERF ? 7 : 14)) return;
+  if (trivial && popups.length > 14) return;
 
   // Fan any popup that would land ON the orb out to a ring around it, using a
   // golden-angle step so successive popups spread instead of stacking on one pixel.
@@ -920,8 +915,7 @@ function spawnPopup(x, y, text, color) {
   }
 
   popups.push({ x: px, y: py, text, color, life: 1, vy: -1.2 });
-  const popupCap = MOBILE_PERF ? 14 : 28;
-  if (popups.length > popupCap) popups.splice(0, popups.length - popupCap);
+  if (popups.length > 28) popups.splice(0, popups.length - 28);
 }
 
 // ── Game lifecycle ──
@@ -1333,7 +1327,6 @@ function update(dt) {
 
 // ── Render ──
 function render() {
-  const perfLite = MOBILE_PERF;
   ctx.fillStyle = '#06060f';
   ctx.fillRect(0, 0, W, H);
 
@@ -1386,27 +1379,25 @@ function render() {
   ctx.globalAlpha = 1;
 
   // ── Subtle grid ──
-  if (!perfLite) {
-    ctx.strokeStyle = 'rgba(60,50,110,0.15)';
-    ctx.lineWidth = 1 / zoom;
-    const gridSize = 100;
-    const gx0 = Math.floor((world.x - W / 2 / zoom) / gridSize) * gridSize;
-    const gx1 = world.x + W / 2 / zoom;
-    const gy0 = Math.floor((world.y - H / 2 / zoom) / gridSize) * gridSize;
-    const gy1 = world.y + H / 2 / zoom;
-    ctx.beginPath();
-    for (let x = gx0; x <= gx1; x += gridSize) {
-      ctx.moveTo(x, gy0); ctx.lineTo(x, gy1);
-    }
-    for (let y = gy0; y <= gy1; y += gridSize) {
-      ctx.moveTo(gx0, y); ctx.lineTo(gx1, y);
-    }
-    ctx.stroke();
+  ctx.strokeStyle = 'rgba(60,50,110,0.15)';
+  ctx.lineWidth = 1 / zoom;
+  const gridSize = 100;
+  const gx0 = Math.floor((world.x - W / 2 / zoom) / gridSize) * gridSize;
+  const gx1 = world.x + W / 2 / zoom;
+  const gy0 = Math.floor((world.y - H / 2 / zoom) / gridSize) * gridSize;
+  const gy1 = world.y + H / 2 / zoom;
+  ctx.beginPath();
+  for (let x = gx0; x <= gx1; x += gridSize) {
+    ctx.moveTo(x, gy0); ctx.lineTo(x, gy1);
   }
+  for (let y = gy0; y <= gy1; y += gridSize) {
+    ctx.moveTo(gx0, y); ctx.lineTo(gx1, y);
+  }
+  ctx.stroke();
 
   // ── Foods ──
   let foodsDrawn = 0;
-  const maxFoodDraws = perfLite ? 105 : 190;
+  const maxFoodDraws = 190;
   for (const f of foods) {
     if (foodsDrawn >= maxFoodDraws) break;
     const pulse = 1 + Math.sin(f.pulse) * (f.tier === 'jackpot' ? 0.24 : f.tier === 'feast' ? 0.20 : 0.15);
@@ -1416,19 +1407,17 @@ function render() {
     const screenR = r * zoom;
     if (fsx < -360 - screenR || fsx > W + 360 + screenR || fsy < -360 - screenR || fsy > H + 360 + screenR) continue;
     foodsDrawn++;
-    if (!perfLite || f.tier === 'feast' || f.tier === 'jackpot') {
-      const glow = f.glow || 3;
-      // glow
-      const glowRadius = Math.min(r * glow, 220 / Math.max(zoom, 0.0001));
-      const grd = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowRadius);
-      const glowAlpha = f.tier === 'jackpot' ? 0.76 : f.tier === 'feast' ? 0.62 : 0.48;
-      grd.addColorStop(0, `hsla(${f.hue}, 92%, 66%, ${glowAlpha})`);
-      grd.addColorStop(1, `hsla(${f.hue}, 92%, 66%, 0)`);
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, glowRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const glow = f.glow || 3;
+    // glow
+    const glowRadius = Math.min(r * glow, 220 / Math.max(zoom, 0.0001));
+    const grd = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, glowRadius);
+    const glowAlpha = f.tier === 'jackpot' ? 0.76 : f.tier === 'feast' ? 0.62 : 0.48;
+    grd.addColorStop(0, `hsla(${f.hue}, 92%, 66%, ${glowAlpha})`);
+    grd.addColorStop(1, `hsla(${f.hue}, 92%, 66%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
     // big-food ring / jackpot target marker
     if (f.ring) {
       ctx.strokeStyle = f.tier === 'jackpot' ? 'rgba(255,230,90,0.9)' : `hsla(${f.hue}, 100%, 78%, 0.55)`;
@@ -1445,12 +1434,10 @@ function render() {
     ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
     ctx.fill();
     // inner pop
-    if (!perfLite) {
-      ctx.fillStyle = `hsla(${f.hue}, 100%, 86%, 0.82)`;
-      ctx.beginPath();
-      ctx.arc(f.x - r * 0.3, f.y - r * 0.3, r * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.fillStyle = `hsla(${f.hue}, 100%, 86%, 0.82)`;
+    ctx.beginPath();
+    ctx.arc(f.x - r * 0.3, f.y - r * 0.3, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
     if (f.label) {
       ctx.fillStyle = f.tier === 'jackpot' ? '#fff5a8' : 'rgba(255,255,255,0.78)';
       const labelSize = Math.max(11 / Math.max(zoom, 0.0001), Math.min(r * 0.22, 42 / Math.max(zoom, 0.0001)));
@@ -1490,16 +1477,14 @@ function render() {
       continue; // don't draw the body yet
     }
 
-    if (!perfLite) {
-      // glow
-      const grd = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 2.5);
-      grd.addColorStop(0, `hsla(${tHue}, 90%, 50%, 0.4)`);
-      grd.addColorStop(1, `hsla(${tHue}, 90%, 50%, 0)`);
-      ctx.fillStyle = grd;
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, r * 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // glow
+    const grd = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, r * 2.5);
+    grd.addColorStop(0, `hsla(${tHue}, 90%, 50%, 0.4)`);
+    grd.addColorStop(1, `hsla(${tHue}, 90%, 50%, 0)`);
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
 
     // spikes
     ctx.fillStyle = `hsl(${tHue}, 75%, 40%)`;
@@ -1561,16 +1546,14 @@ function render() {
       // always safe. No more cosmic LOD degradation needed.
 
       // Outer glow (intensifies with combo, capped in screen space)
-      if (!perfLite) {
-        const glowSize = Math.min(r * (3 + Math.min(combo, 15) * 0.15), 360 / _z);
-        const grd = ctx.createRadialGradient(px, py, 0, px, py, glowSize);
-        grd.addColorStop(0, `hsla(${phue}, 90%, 65%, ${0.5 + Math.min(combo, 15) * 0.02})`);
-        grd.addColorStop(1, `hsla(${phue}, 90%, 65%, 0)`);
-        ctx.fillStyle = grd;
-        ctx.beginPath();
-        ctx.arc(px, py, glowSize, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const glowSize = Math.min(r * (3 + Math.min(combo, 15) * 0.15), 360 / _z);
+      const grd = ctx.createRadialGradient(px, py, 0, px, py, glowSize);
+      grd.addColorStop(0, `hsla(${phue}, 90%, 65%, ${0.5 + Math.min(combo, 15) * 0.02})`);
+      grd.addColorStop(1, `hsla(${phue}, 90%, 65%, 0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(px, py, glowSize, 0, Math.PI * 2);
+      ctx.fill();
 
       // Body with squash
       ctx.save();
@@ -1581,15 +1564,13 @@ function render() {
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.fill();
       // inner gradient
-      if (!perfLite) {
-        const ig = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
-        ig.addColorStop(0, `hsla(${phue}, 100%, 80%, 0.9)`);
-        ig.addColorStop(1, `hsla(${phue}, 100%, 50%, 0)`);
-        ctx.fillStyle = ig;
-        ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const ig = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r);
+      ig.addColorStop(0, `hsla(${phue}, 100%, 80%, 0.9)`);
+      ig.addColorStop(1, `hsla(${phue}, 100%, 50%, 0)`);
+      ctx.fillStyle = ig;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
       // bright highlight
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.beginPath();
@@ -1683,13 +1664,11 @@ function render() {
   }
 
   // ── Vignette ──
-  if (!perfLite) {
-    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
-    vg.addColorStop(0, 'rgba(0,0,0,0)');
-    vg.addColorStop(1, 'rgba(0,0,0,0.5)');
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, W, H);
-  }
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
 
   // ── Achievement toasts (screen space, after ctx.restore) ──
   for (let i = 0; i < achievements_toast.length; i++) {
