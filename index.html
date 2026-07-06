@@ -275,9 +275,12 @@ const primeAudioOnGesture = () => { void initAudio('gesture'); };
 // ── Audio (Web Audio synth — tiny SFX, no files) ──
 let audioCtx;
 let lastEatSfxAt = 0;
+let lastNativeEatSfxAt = 0;
 let audioUnlockInFlight = false;
 let audioUnlocked = false;
 const nativeToneCache = new Map();
+const NATIVE_SFX_POOL_SIZE = 2;
+const NATIVE_EAT_MIN_GAP_MS = 115; // iPhone HTMLAudio is main-thread heavy; keep snack clicks sparse.
 
 function encodeWav(samples, sampleRate = 8000) {
   const bytesPerSample = 2;
@@ -367,7 +370,7 @@ function unlockNativeSfxPool() {
   if (nativeSfxUnlocked) return;
   nativeSfxUnlocked = true;
   for (const name of Object.keys(NATIVE_SFX)) {
-    nativeSfxPools[name] = nativeSfxPools[name] || Array.from({ length: 3 }, () => makeNativeSfxAudio(name));
+    nativeSfxPools[name] = nativeSfxPools[name] || Array.from({ length: NATIVE_SFX_POOL_SIZE }, () => makeNativeSfxAudio(name));
     nativeSfxCursor[name] = 0;
     for (const audio of nativeSfxPools[name]) {
       try {
@@ -385,17 +388,19 @@ function unlockNativeSfxPool() {
 }
 
 function playNativeSfx(name) {
-  const pool = nativeSfxPools[name] || (nativeSfxPools[name] = [makeNativeSfxAudio(name)]);
+  // Important for iPhone: use ONLY the pre-unlocked pool during gameplay.
+  // Creating/decoding fresh data-URI Audio objects while eating creates Safari jank.
+  const pool = nativeSfxPools[name];
+  if (!pool || !pool.length) return;
   const i = nativeSfxCursor[name] = ((nativeSfxCursor[name] || 0) + 1) % pool.length;
   const audio = pool[i];
   try {
     audio.pause();
     audio.currentTime = 0;
     audio.volume = 1;
-    audio.play().catch(() => playNativeTone(...NATIVE_SFX[name]));
-  } catch {
-    playNativeTone(...NATIVE_SFX[name]);
-  }
+    const p = audio.play();
+    if (p) p.catch(() => {});
+  } catch {}
 }
 
 function webAudioRunning() {
@@ -457,13 +462,17 @@ function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
 }
 function sfxEat(combo) {
   const now = performance.now();
-  if (now - lastEatSfxAt < 25) return; // eating cascades should not spawn 100 oscillators/frame
-  lastEatSfxAt = now;
   if (!webAudioRunning()) {
-    playNativeSfx('eat1');
-    setTimeout(() => playNativeSfx('eat2'), 30);
+    // On iPhone, HTMLAudio play/pause/currentTime is expensive. One short bite
+    // blip every ~0.1s keeps audio alive without turning feast cascades into a
+    // queue of media-element work that drags the whole game into slow motion.
+    if (now - lastNativeEatSfxAt < NATIVE_EAT_MIN_GAP_MS) return;
+    lastNativeEatSfxAt = now;
+    playNativeSfx(combo > 8 ? 'eat2' : 'eat1');
     return;
   }
+  if (now - lastEatSfxAt < 25) return; // WebAudio is cheap; still cap oscillator spam.
+  lastEatSfxAt = now;
   const base = 300 + Math.min(combo, 20) * 40;
   playTone(base, 0.1, 'square', 0.08, base * 0.8);
   setTimeout(() => playTone(base * 1.5, 0.08, 'sine', 0.06), 30);
