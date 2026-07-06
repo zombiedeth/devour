@@ -277,54 +277,51 @@ let audioCtx;
 let lastEatSfxAt = 0;
 let audioUnlockInFlight = false;
 let audioUnlocked = false;
-const PRIME_BEEP = 'data:audio/wav;base64,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';
 
 function primeAudioHardware() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return false;
+  if (!AudioContextClass) return Promise.resolve();
   try {
     audioCtx = audioCtx || new AudioContextClass();
-    if (audioCtx.state === 'suspended') {
-      void audioCtx.resume();
-    }
-    // Prime synchronously inside the gesture so iPhone Safari gets a real
-    // activation-backed node graph immediately.
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.14);
-    try {
-      const beep = new Audio(PRIME_BEEP);
-      beep.volume = 0.85;
-      beep.play().catch(() => {});
-    } catch {}
-    return true;
+    const resumePromise = audioCtx.state === 'running' ? Promise.resolve() : audioCtx.resume();
+    const primePromise = resumePromise.then(() => {
+      // Tiny hardware prime: this spends the activation token on iPhone Safari
+      // so the first real SFX doesn't get swallowed by a pending resume.
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.14);
+    });
+    return Promise.race([
+      primePromise,
+      new Promise(resolve => setTimeout(resolve, 1200)),
+    ]);
   } catch {
-    return false;
+    return Promise.resolve();
   }
 }
 
 function initAudio(reason = 'gesture') {
   if (audioUnlocked || audioUnlockInFlight) return Promise.resolve(audioUnlocked);
   audioUnlockInFlight = true;
-  primeAudioHardware();
-  queueMicrotask(() => {
-    audioUnlocked = !!audioCtx && audioCtx.state === 'running';
-    audioUnlockInFlight = false;
-  });
-  return Promise.resolve(true);
+  return primeAudioHardware()
+    .then(() => {
+      audioUnlocked = !!audioCtx && audioCtx.state === 'running';
+      return audioUnlocked;
+    })
+    .catch(() => false)
+    .finally(() => {
+      audioUnlockInFlight = false;
+    });
 }
 
 function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  if (!audioCtx) return;
-  if (audioCtx.state === 'suspended') {
-    void audioCtx.resume();
-  }
+  if (!audioCtx || audioCtx.state !== 'running') return;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = type;
@@ -796,8 +793,6 @@ function startGame() {
   for (let i = 0; i < 4; i++) spawnThreat();
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('gameOverScreen').classList.add('hidden');
-  void initAudio('start');
-  sfxLevel();
 }
 
 function gameOver() {
