@@ -275,14 +275,12 @@ const primeAudioOnGesture = () => { void initAudio('gesture'); };
 // ── Audio (Web Audio synth — tiny SFX, no files) ──
 let audioCtx;
 let lastEatSfxAt = 0;
+let lastNativeEatSfxAt = 0;
 let audioUnlockInFlight = false;
 let audioUnlocked = false;
 const nativeToneCache = new Map();
 const NATIVE_SFX_POOL_SIZE = 2;
-// Mobile Safari gets sluggish if rapid eat events hit HTMLAudio. Keep native
-// fallback for rare milestone/death sounds only; WebAudio handles eat clicks
-// when it is actually running.
-const NATIVE_UNLOCK_SFX_NAMES = ['level1', 'level2', 'level3', 'death1', 'death2'];
+const NATIVE_EAT_MIN_GAP_MS = 115; // iPhone HTMLAudio is main-thread heavy; keep snack clicks sparse.
 
 function encodeWav(samples, sampleRate = 8000) {
   const bytesPerSample = 2;
@@ -371,7 +369,7 @@ function makeNativeSfxAudio(name) {
 function unlockNativeSfxPool() {
   if (nativeSfxUnlocked) return;
   nativeSfxUnlocked = true;
-  for (const name of NATIVE_UNLOCK_SFX_NAMES) {
+  for (const name of Object.keys(NATIVE_SFX)) {
     nativeSfxPools[name] = nativeSfxPools[name] || Array.from({ length: NATIVE_SFX_POOL_SIZE }, () => makeNativeSfxAudio(name));
     nativeSfxCursor[name] = 0;
     for (const audio of nativeSfxPools[name]) {
@@ -465,9 +463,12 @@ function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
 function sfxEat(combo) {
   const now = performance.now();
   if (!webAudioRunning()) {
-    // iPhone fix: do NOT route rapid eating through HTMLAudio. Even throttled
-    // media-element play/pause/currentTime calls make Mobile Safari crawl.
-    // Keep native fallback for rare level/death beats only.
+    // On iPhone, HTMLAudio play/pause/currentTime is expensive. One short bite
+    // blip every ~0.1s keeps audio alive without turning feast cascades into a
+    // queue of media-element work that drags the whole game into slow motion.
+    if (now - lastNativeEatSfxAt < NATIVE_EAT_MIN_GAP_MS) return;
+    lastNativeEatSfxAt = now;
+    playNativeSfx(combo > 8 ? 'eat2' : 'eat1');
     return;
   }
   if (now - lastEatSfxAt < 25) return; // WebAudio is cheap; still cap oscillator spam.
