@@ -267,17 +267,61 @@ canvas.addEventListener('touchstart', e => {
   setMouse(t.clientX, t.clientY);
 }, { passive: true });
 
+const primeAudioOnGesture = () => { void initAudio('gesture'); };
+['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, primeAudioOnGesture, { capture: true, passive: true });
+});
+
 // ── Audio (Web Audio synth — tiny SFX, no files) ──
 let audioCtx;
 let lastEatSfxAt = 0;
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioUnlockInFlight = false;
+let audioUnlocked = false;
+
+function primeAudioHardware() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return Promise.resolve();
+  try {
+    audioCtx = audioCtx || new AudioContextClass();
+    const resumePromise = audioCtx.state === 'running' ? Promise.resolve() : audioCtx.resume();
+    const primePromise = resumePromise.then(() => {
+      // Tiny hardware prime: this spends the activation token on iPhone Safari
+      // so the first real SFX doesn't get swallowed by a pending resume.
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.14);
+    });
+    return Promise.race([
+      primePromise,
+      new Promise(resolve => setTimeout(resolve, 1200)),
+    ]);
+  } catch {
+    return Promise.resolve();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
 }
+
+function initAudio(reason = 'gesture') {
+  if (audioUnlocked || audioUnlockInFlight) return Promise.resolve(audioUnlocked);
+  audioUnlockInFlight = true;
+  return primeAudioHardware()
+    .then(() => {
+      audioUnlocked = !!audioCtx && audioCtx.state === 'running';
+      return audioUnlocked;
+    })
+    .catch(() => false)
+    .finally(() => {
+      audioUnlockInFlight = false;
+    });
+}
+
 function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  if (!audioCtx) return;
+  if (!audioCtx || audioCtx.state !== 'running') return;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = type;
