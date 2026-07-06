@@ -1736,10 +1736,28 @@ function roundRect(ctx, x, y, w, h, r) {
 
 // ── Game loop ──
 let lastTime = performance.now();
+let fixedStepAccumulator = 0;
+const FIXED_STEP_MAX_FRAME = 8; // cap tab-switch spikes, not normal low-FPS frames
+const FIXED_STEP_MAX_UPDATES = 5; // enough catch-up for 12fps without death spirals
+function stepFrame(frameUnits) {
+  fixedStepAccumulator += Math.min(frameUnits, FIXED_STEP_MAX_FRAME);
+  let steps = 0;
+  while (fixedStepAccumulator >= 1 && steps < FIXED_STEP_MAX_UPDATES) {
+    update(1);
+    fixedStepAccumulator -= 1;
+    steps++;
+  }
+  if (steps === FIXED_STEP_MAX_UPDATES && fixedStepAccumulator > 2) {
+    // If the browser stalls hard, drop the backlog instead of queueing seconds
+    // of delayed simulation. This keeps control responsive after Safari hitches.
+    fixedStepAccumulator = 0;
+  }
+  return steps;
+}
 function loop(now) {
-  const dt = Math.min((now - lastTime) / 16.67, 3); // delta in frame units, clamped
+  const frameUnits = (now - lastTime) / 16.67;
   lastTime = now;
-  update(dt);
+  stepFrame(frameUnits);
   render();
   requestAnimationFrame(loop);
 }
