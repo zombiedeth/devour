@@ -118,6 +118,32 @@
     letter-spacing: 1px; margin-bottom: 32px; text-transform: uppercase;
   }
 
+  /* ── Audio Debug ── */
+  #audioDebug {
+    position: absolute; right: 12px; bottom: 12px; z-index: 30;
+    width: min(92vw, 320px); max-height: 42vh; overflow: auto;
+    padding: 12px 12px 10px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 16px;
+    background: rgba(8,10,18,0.9);
+    color: #d7e0ff; font: 12px/1.35 monospace;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    pointer-events: auto;
+    white-space: pre-wrap;
+  }
+  #audioDebug.hidden { display: none; }
+  #audioDebug .row { margin: 0 0 8px; }
+  #audioDebug .label2 { color: #8c5aff; font-weight: 700; margin-bottom: 4px; }
+  #audioDebug button {
+    pointer-events: auto; width: 100%; border: 0; border-radius: 12px;
+    padding: 10px 12px; margin-top: 8px; font: inherit; font-weight: 900;
+    color: #06060f; background: linear-gradient(135deg, #ffd24d, #8c5aff);
+  }
+  #audioDebug code { color: #ffd24d; }
+</style>
+</head>
+<body>
+
   /* ── Ad-reward style buttons ── */
   .reward-btn {
     font-family: inherit;
@@ -227,6 +253,17 @@
   <button class="play-btn" id="retryBtn">RETRY</button>
 </div>
 
+<div id="audioDebug" class="hidden">
+  <div class="row"><div class="label2">AUDIO DEBUG</div><div id="audioDebugSummary">loading…</div></div>
+  <div class="row"><div class="label2">Last gesture</div><div id="audioDebugGesture">—</div></div>
+  <div class="row"><div class="label2">Last event</div><div id="audioDebugEvent">—</div></div>
+  <div class="row"><div class="label2">Last result</div><div id="audioDebugResult">—</div></div>
+  <div class="row"><div class="label2">Context</div><div id="audioDebugContext">—</div></div>
+  <div class="row"><div class="label2">Route</div><div id="audioDebugRoute">—</div></div>
+  <div class="row"><div class="label2">Device</div><div id="audioDebugDevice">—</div></div>
+  <button id="audioDebugBeep">TEST BEEP</button>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
 //  DEVOUR — arena devourer. Single-file HTML5 Canvas game.
@@ -267,22 +304,101 @@ canvas.addEventListener('touchstart', e => {
   setMouse(t.clientX, t.clientY);
 }, { passive: true });
 
-const primeAudioOnGesture = () => { initAudio('gesture'); };
+let audioCtx;
+let lastEatSfxAt = 0;
+let audioUnlocked = false;
+
+const audioDebugEnabled = new URLSearchParams(location.search).has('audioDebug');
+const audioDebugState = {
+  lastGesture: '—',
+  lastEvent: '—',
+  lastResult: '—',
+  lastError: '—',
+  attempts: 0,
+};
+const audioDebugRefs = audioDebugEnabled ? {
+  panel: document.getElementById('audioDebug'),
+  summary: document.getElementById('audioDebugSummary'),
+  gesture: document.getElementById('audioDebugGesture'),
+  event: document.getElementById('audioDebugEvent'),
+  result: document.getElementById('audioDebugResult'),
+  context: document.getElementById('audioDebugContext'),
+  route: document.getElementById('audioDebugRoute'),
+  device: document.getElementById('audioDebugDevice'),
+  beep: document.getElementById('audioDebugBeep'),
+} : null;
+
+function audioDebugRefresh() {
+  if (!audioDebugEnabled || !audioDebugRefs) return;
+  const ua = navigator.userAgent;
+  const ctxState = audioCtx ? audioCtx.state : 'none';
+  const route = [
+    `audioUnlocked=${audioUnlocked}`,
+    `ctx=${ctxState}`,
+    `attempts=${audioDebugState.attempts}`,
+    `err=${audioDebugState.lastError}`,
+  ].join(' · ');
+  audioDebugRefs.summary.textContent = `visible=${document.visibilityState} · focus=${document.hasFocus()} · online=${navigator.onLine}`;
+  audioDebugRefs.gesture.textContent = audioDebugState.lastGesture;
+  audioDebugRefs.event.textContent = audioDebugState.lastEvent;
+  audioDebugRefs.result.textContent = audioDebugState.lastResult;
+  audioDebugRefs.context.textContent = audioCtx
+    ? `state=${ctxState} sampleRate=${audioCtx.sampleRate || 'n/a'} baseLatency=${audioCtx.baseLatency ?? 'n/a'} outputLatency=${audioCtx.outputLatency ?? 'n/a'}`
+    : 'no AudioContext yet';
+  audioDebugRefs.route.textContent = route;
+  audioDebugRefs.device.textContent = ua;
+}
+
+function markAudioResult(result, err = '') {
+  audioDebugState.lastResult = result;
+  audioDebugState.lastError = err || '—';
+  audioDebugRefresh();
+}
+
+function primeAudioOnGesture(evt) {
+  audioDebugState.lastGesture = evt.type;
+  audioDebugState.lastEvent = evt.type;
+  audioDebugState.attempts += 1;
+  const ok = initAudio(evt.type);
+  markAudioResult(ok ? 'prime ok' : 'prime failed', ok ? '' : (audioDebugState.lastError || 'state not running'));
+}
+
+if (audioDebugEnabled) {
+  audioDebugRefs.panel.classList.remove('hidden');
+  audioDebugRefs.beep.addEventListener('click', () => {
+    audioDebugState.lastGesture = 'TEST BEEP';
+    audioDebugState.lastEvent = 'TEST BEEP';
+    audioDebugState.attempts += 1;
+    const ok = initAudio('debug-beep');
+    if (ok) {
+      playTone(880, 0.12, 'sine', 0.2);
+      setTimeout(() => playTone(1320, 0.08, 'sine', 0.12), 120);
+      markAudioResult('beep played', '');
+    } else {
+      markAudioResult('beep blocked', audioDebugState.lastError || 'AudioContext not running');
+    }
+  });
+  audioDebugRefresh();
+}
+
 ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(evt => {
   window.addEventListener(evt, primeAudioOnGesture, { capture: true, passive: true });
 });
 
 // ── Audio (Web Audio synth — tiny SFX, no files) ──
-let audioCtx;
-let lastEatSfxAt = 0;
-let audioUnlocked = false;
 
 function primeAudioHardware() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return false;
+  if (!AudioContextClass) {
+    audioDebugState.lastError = 'No AudioContext support';
+    return false;
+  }
   try {
     audioCtx = audioCtx || new AudioContextClass();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(err => {
+      audioDebugState.lastError = String(err && err.message ? err.message : err);
+      audioDebugRefresh();
+    });
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'square';
@@ -292,20 +408,27 @@ function primeAudioHardware() {
     osc.connect(gain).connect(audioCtx.destination);
     osc.start();
     osc.stop(audioCtx.currentTime + 0.14);
+    audioDebugState.lastError = '—';
     return true;
-  } catch {
+  } catch (err) {
+    audioDebugState.lastError = String(err && err.message ? err.message : err);
     return !!audioCtx && audioCtx.state === 'running';
   }
 }
 
 function initAudio(reason = 'gesture') {
-  primeAudioHardware();
+  const ok = primeAudioHardware();
   audioUnlocked = !!audioCtx && audioCtx.state === 'running';
+  audioDebugState.lastEvent = reason;
+  markAudioResult(ok && audioUnlocked ? 'running' : `not running (${audioCtx ? audioCtx.state : 'none'})`, audioDebugState.lastError);
   return audioUnlocked;
 }
 
 function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
-  if (!audioCtx || audioCtx.state !== 'running') return;
+  if (!audioCtx || audioCtx.state !== 'running') {
+    if (audioDebugEnabled) markAudioResult('tone skipped', audioCtx ? audioCtx.state : 'no ctx');
+    return;
+  }
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
   osc.type = type;
@@ -316,7 +439,12 @@ function playTone(freq, dur, type = 'sine', vol = 0.15, slide = 0) {
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
   osc.stop(audioCtx.currentTime + dur);
+  if (audioDebugEnabled) {
+    audioDebugState.lastResult = `tone ${Math.round(freq)}Hz`;
+    audioDebugRefresh();
+  }
 }
+
 function sfxEat(combo) {
   const now = performance.now();
   if (now - lastEatSfxAt < 25) return; // eating cascades should not spawn 100 oscillators/frame
